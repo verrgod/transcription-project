@@ -1,3 +1,4 @@
-FROM python:3.10-slim
-RUN apt-get update && apt-get install -y ffmpeg
-RUN pip install faster-whisper
+FROM nvcr.io/nvidia/tritonserver:24.12-vllm-python-py3
+RUN apt-get update && apt-get install -y ffmpeg && \
+    pip3 install faster-whisper && \
+    pip3 install pydub

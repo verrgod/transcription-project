@@ -2,20 +2,21 @@ docker login nvcr.io
 docker pull nvcr.io/nvidia/tritonserver:24.12-vllm-python-py3
 
 (install faster-whisper model onto triton inference server)
-FROM python:3.10-slim
+FROM nvcr.io/nvidia/tritonserver:24.12-vllm-python-py3
 RUN apt-get update && apt-get install -y ffmpeg
 RUN pip install faster-whisper
 
-(create model in new directory)
-models\my_python_model\1\model.py
-
 (run on powershell)
+(image build)
+docker build -t my-triton-faster-whisper:latest .
+
+(run on the built image)
 docker run --rm --gpus all -it `
   --privileged `
   -p8000:8000 -p8001:8001 -p8002:8002 `
   --shm-size=1G --ulimit memlock=-1 --ulimit stack=67108864 `
   -v "$PWD\models:/models" `
-  nvcr.io/nvidia/tritonserver:24.12-vllm-python-py3 `
+  my-triton-faster-whisper:latest `
   tritonserver --model-repository=/models
 
 =====check versions====
@@ -31,11 +32,6 @@ curl -v localhost:8000/v2/health/ready
 (run docker-compose.yml to setup containers, 8088 ksqldb)
 docker compose up
 docker exec -it ksqldb-cli ksql http://ksqldb-server:8088
-
-(get --network=NETWORK NAME by doing docker network ls)
-(docker network inspect NETWORK name to check if kafka running if got connectivity issues)
-(once fine run this)
-docker run -it --network=sl_assignment_default edenhill/kcat:1.7.1 -b kafka:9092 -L
 
 (ksql stream)
 CREATE STREAM minio_media_events (
@@ -74,12 +70,17 @@ SELECT
 FROM minio_media_events
 EMIT CHANGES;
 
-curl -v --location --request POST 'http://0.0.0.0:8000/v2/models/faster-whisper-large-v3/infer' \
+(get --network=NETWORK NAME by doing docker network ls)
+(docker network inspect NETWORK name to check if kafka running if got connectivity issues)
+(once fine run this)
+docker run -it --network=transcription-project_default edenhill/kcat:1.7.1 -b kafka:9092 -L
+
+curl -v --location POST 'http://localhost:8000/v2/models/faster-whisper-large-v3/infer' \
 --header 'Content-Type: application/octet-stream' \
 --data-binary @transcribing_1.mp3 \
 -H "Inference-Header-Content-Length: 0" -o resp.txt
 
-curl -v --location --request POST 'http://0.0.0.0:8000/v2/models/faster-whisper-large-v3/infer' \
+curl -v --location --request POST 'http://localhost:8000/v2/models/faster-whisper-large-v3/infer' \
 --header 'Content-Type: application/octet-stream' \
 --data-binary @harvard.wav \
 -H "Inference-Header-Content-Length: 0" -o resp.txt

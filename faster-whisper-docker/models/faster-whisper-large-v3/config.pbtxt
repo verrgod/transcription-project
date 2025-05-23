@@ -3,15 +3,15 @@ backend: "python"
 max_batch_size: 1
 input [
   {
-    name: "INPUT0"
-    data_type: TYPE_FP32
+    name: "AUDIO"
+    data_type: TYPE_STRING
     dims: [ 1 ]
   }
 ]
 output [
   {
-    name: "OUTPUT0"
-    data_type: TYPE_FP32
+    name: "TRANSCRIPTION"
+    data_type: TYPE_STRING
     dims: [ 1 ]
   }
 ]
