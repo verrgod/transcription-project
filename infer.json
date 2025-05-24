@@ -1,0 +1,14 @@
+{
+  "inputs": [
+    {
+      "name": "AUDIO",
+      "shape": [1],
+      "datatype": "BYTES"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "TRANSCRIPTION"
+    }
+  ]
+}
