@@ -27,7 +27,7 @@ MINIO_CONFIG = {
     'secure': False,
 }
 
-INFERENCE_URL = "http://localhost:8000/v2/models/faster-whisper-large-v3/infer"
+INFERENCE_URL = "http://triton:8000/v2/models/faster-whisper-large-v3/infer"
 
 # MinIO Client
 minio_client = Minio(

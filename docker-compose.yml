@@ -1,3 +1,7 @@
+networks:
+  triton-net:
+    driver: bridge
+
 services:
   triton:
     image: my-triton-faster-whisper:latest
@@ -10,7 +14,7 @@ services:
             - capabilities: [gpu]  # Requires Docker + NVIDIA runtime
 
     volumes:
-      - ./models:/models
+      - ./faster-whisper-docker/models:/models
 
     ports:
       - "8000:8000"  # HTTP
@@ -24,6 +28,8 @@ services:
 
     runtime: nvidia
     privileged: true
+    networks:
+      - triton-net
 
   minio-server:
     image: minio/minio
@@ -144,12 +150,14 @@ services:
     build:
       context: ./media_processor
       dockerfile: Dockerfile
+    networks:
+      - triton-net
     depends_on:
       - kafka
       - triton
       - minio-server
     environment:
-      INFERENCE_URL: http://localhost:8000/v2/models/faster-whisper-large-v3/infer
+      INFERENCE_URL: http://triton:8000/v2/models/faster-whisper-large-v3/infer
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       MINIO_ENDPOINT: minio-server:9000
       MINIO_ACCESS_KEY: minio
