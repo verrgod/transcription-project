@@ -1,30 +1,4 @@
 services:
-  triton:
-    image: my-triton-faster-whisper:latest
-    container_name: triton-faster-whisper
-    command: tritonserver --model-repository=/models
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [gpu]  # Requires Docker + NVIDIA runtime
-
-    volumes:
-      - ./models:/models
-
-    ports:
-      - "8000:8000"  # HTTP
-      - "8001:8001"  # gRPC
-      - "8002:8002"  # Metrics
-
-    shm_size: 1g
-    ulimits:
-      memlock: -1
-      stack: 67108864
-
-    runtime: nvidia
-    privileged: true
-
   minio-server:
     image: minio/minio
     container_name: minio
