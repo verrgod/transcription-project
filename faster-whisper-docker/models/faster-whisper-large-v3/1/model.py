@@ -17,22 +17,40 @@ class TritonPythonModel:
             try:
                 input_tensor = pb_utils.get_input_tensor_by_name(request, "AUDIO")
                 audio_data = input_tensor.as_numpy()[0].tobytes()
-
                 logging.debug(f"Audio data length: {len(audio_data)} bytes")
 
                 audio = AudioSegment.from_file(io.BytesIO(audio_data), format="wav")
+                wav_io = io.BytesIO()
+                audio.export(wav_io, format="wav")
+                wav_io.seek(0)
 
-                wav_path = "/tmp/input.wav"
-                audio.export(wav_path, format="wav")
+                segments, _ = self.model.transcribe(wav_io, language="en", beam_size=5)
 
-                segments, _ = self.model.transcribe(wav_path)
-                full_text = " ".join([segment.text for segment in segments])
-                output_tensor = pb_utils.Tensor("TRANSCRIPTION", np.array([full_text.encode('utf-8')], dtype=np.bytes_))
+                vtt_lines = ["WEBVTT\n"]
+                for i, segment in enumerate(segments):
+                    start = self.format_timestamp(segment.start)
+                    end = self.format_timestamp(segment.end)
+                    text = segment.text.strip()
+                    vtt_lines.append(f"{i+1}")
+                    vtt_lines.append(f"{start} --> {end}")
+                    vtt_lines.append(f"{text}\n")
+                vtt_content = "\n".join(vtt_lines)
+
+                output_tensor = pb_utils.Tensor("TRANSCRIPTION", np.array([vtt_content.encode('utf-8')], dtype=np.bytes_))
                 responses.append(pb_utils.InferenceResponse(output_tensors=[output_tensor]))
+
             except Exception as e:
                 logging.exception("Error in audio processing")
                 raise
         return responses
+    
+    def format_timestamp(self, seconds: float) -> str:
+        # Format time as HH:MM:SS.mmm for WebVTT
+        h = int(seconds // 3600)
+        m = int((seconds % 3600) // 60)
+        s = int(seconds % 60)
+        ms = int((seconds - int(seconds)) * 1000)
+        return f"{h:02}:{m:02}:{s:02}.{ms:03}"
 
     def finalize(self):
         pass
