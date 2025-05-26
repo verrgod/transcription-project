@@ -24,7 +24,7 @@ services:
 
     runtime: nvidia
     privileged: true
-    
+
   minio-server:
     image: minio/minio
     container_name: minio
@@ -35,7 +35,7 @@ services:
       - minio.env
     command: server /data --console-address :9001
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "curl", "-f", "http://minio-server:9000/minio/health/live"]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -47,22 +47,19 @@ services:
     env_file:
       - minio.env
       - kafka.env
-    restart: on-failure
     entrypoint: >
       /bin/sh -c "
-      mc config host add dc-minio http://$${X_MINIO_DOCKER_SERVICE}:$${X_MINIO_PORT} $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
-      mc admin config get dc-minio notify_kafka;
-      mc admin config set dc-minio notify_kafka:1 tls_skip_verify="off" queue_dir="" queue_limit="0" sasl="off" sasl_password="" sasl_username="" tls_client_auth="0" tls="off" client_tls_cert="" client_tls_key="" brokers="$${X_KAFKA_LISTENER_1}" topic="minio-events-v1";
-      mc admin service restart dc-minio;
-      mc mb dc-minio/media;
-      mc event add --event "put" dc-minio/media arn:minio:sqs::1:kafka --suffix .mp3;
-      mc event add --event "put" dc-minio/media arn:minio:sqs::1:kafka --suffix .mp4;
-      mc event add --event "put" dc-minio/media arn:minio:sqs::1:kafka --suffix .wav;
-      mc event add --event "put" dc-minio/media arn:minio:sqs::1:kafka --suffix .avi;
-      mc event add --event "put" dc-minio/media arn:minio:sqs::1:kafka --suffix .mov;
-      mc event add --event "put" dc-minio/media arn:minio:sqs::1:kafka --suffix .flac;
-      mc event add --event "put" dc-minio/media arn:minio:sqs::1:kafka --suffix .mkv;
-      mc event list dc-minio/media;"
+      mc alias set dc-minio http://minio-server:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD} && \
+      mc mb --ignore-existing dc-minio/media && \
+      mc event list dc-minio/media | grep 'sqs' || {
+        mc event add --event put --suffix .mp3 dc-minio/media arn:minio:sqs::1:kafka && \
+        mc event add --event put --suffix .mp4 dc-minio/media arn:minio:sqs::1:kafka && \
+        mc event add --event put --suffix .wav dc-minio/media arn:minio:sqs::1:kafka && \
+        mc event add --event put --suffix .avi dc-minio/media arn:minio:sqs::1:kafka && \
+        mc event add --event put --suffix .mov dc-minio/media arn:minio:sqs::1:kafka && \
+        mc event add --event put --suffix .flac dc-minio/media arn:minio:sqs::1:kafka && \
+        mc event add --event put --suffix .mkv dc-minio/media arn:minio:sqs::1:kafka;
+      }"
     depends_on:
       - minio-server
       - kafka-setup
@@ -133,8 +130,10 @@ services:
     depends_on:
       - kafka
     command: "bash -c 'echo Waiting for Kafka to be ready... && \
-                         cub kafka-ready -b kafka:9092 1 40 && \
-                         kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 10 --replication-factor 1 --topic minio-events-v1'"
+                      cub kafka-ready -b kafka:9092 1 40 && \
+                      kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 10 --replication-factor 1 --topic minio-events-v1 && \
+                      kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 10 --replication-factor 1 --topic vtt-upload'"
+
     environment:
       # The following settings are listed here only to satisfy the image's requirements.
       # We override the image's `command` anyways, hence this container will not start a broker.
@@ -145,6 +144,17 @@ services:
     build:
       context: ./media_processor
       dockerfile: Dockerfile
+    depends_on:
+      - kafka
+      - triton
+      - minio-server
+    environment:
+      INFERENCE_URL: http://localhost:8000/v2/models/faster-whisper-large-v3/infer
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MINIO_ENDPOINT: minio-server:9000
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+    restart: on-failure
   
   ksqldb-init:
     image: curlimages/curl:7.79.1

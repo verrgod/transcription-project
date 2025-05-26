@@ -14,20 +14,20 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # In actual practice, this should be in environmental variables
 # Configuration Variables
 KAFKA_CONFIG = {
-    'bootstrap.servers': '127.0.0.1:29092',
+    'bootstrap.servers': 'kafka:9092',
     'group.id': 'kafka-python-getting-started',
     'auto.offset.reset': 'earliest',
     'security.protocol': 'PLAINTEXT',
 }
 
 MINIO_CONFIG = {
-    'endpoint': '127.0.0.1:9000',
+    'endpoint': 'minio-server:9000',
     'access_key': 'minio',
     'secret_key': 'minio123',
     'secure': False,
 }
 
-INFERENCE_URL = "http://0.0.0.0:8000/v2/models/faster-whisper-large-v3/infer"
+INFERENCE_URL = "http://localhost:8000/v2/models/faster-whisper-large-v3/infer"
 
 # MinIO Client
 minio_client = Minio(
@@ -92,10 +92,18 @@ def upload_to_minio(bucket_name, file_name, data, content_type):
 
 def process_message(message, producer):
     """Process a Kafka message"""
-    file_name = message['FILE_NAME'].replace("+", " ")
-    logging.info(f"Processing file: {file_name}")
+    records = message.get("Records", [])
+    if not records:
+        logging.warning("No Records found in Kafka message.")
+        return
 
-    audio_bytes = retrieve_file_from_minio(message['BUCKET_NAME'], file_name)
+    record = records[0]
+    bucket_name = record["s3"]["bucket"]["name"]
+    file_name = record["s3"]["object"]["key"]
+
+    logging.info(f"Processing file: {file_name} from bucket: {bucket_name}")
+
+    audio_bytes = retrieve_file_from_minio(bucket_name, file_name)
     if audio_bytes:
         vtt_content = run_inference(audio_bytes)
         if vtt_content:
@@ -109,7 +117,7 @@ def main():
     """Main function to run the Kafka consumer loop"""
     consumer = setup_kafka_consumer()
     producer = setup_kafka_producer()
-    topic = "transformed-minio-events"
+    topic = "minio-events-v1"
     consumer.subscribe([topic])
 
     try:
@@ -118,6 +126,8 @@ def main():
             if msg is None:
                 logging.info("Waiting for messages...")
                 continue
+            logging.info(f"📥 Raw Kafka message: {msg.value()}")
+
             if msg.error():
                 logging.error(f"Consumer error: {msg.error()}")
                 continue
