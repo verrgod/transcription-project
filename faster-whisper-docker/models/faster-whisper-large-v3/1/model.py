@@ -16,7 +16,7 @@ class TritonPythonModel:
         for request in requests:
             try:
                 input_tensor = pb_utils.get_input_tensor_by_name(request, "AUDIO")
-                audio_data = input_tensor.as_numpy()[0].tobytes()
+                audio_data = input_tensor.as_numpy().tobytes()
                 logging.debug(f"Audio data length: {len(audio_data)} bytes")
 
                 audio = AudioSegment.from_file(io.BytesIO(audio_data), format=None)

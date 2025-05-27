@@ -116,11 +116,12 @@ def process_message(message, producer):
 
     audio_bytes = retrieve_file_from_minio(bucket_name, file_name)
     if audio_bytes:
-        vtt_content = run_inference(audio_bytes)
+        wav_bytes = convert_to_wav_bytes(audio_bytes)
+        vtt_content = run_inference(wav_bytes)
         if vtt_content:
             dest_name = f'{file_name}.vtt'
             upload_to_minio('media-vtt', dest_name, vtt_content.encode('utf-8'), 'text/vtt')
-            producer.produce("VTT Upload", 'testing', dest_name)
+            producer.produce("vtt-upload", 'testing', dest_name)
             producer.flush()
             logging.info(f"Produced event for {dest_name}")
 
