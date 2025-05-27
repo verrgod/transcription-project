@@ -13,6 +13,11 @@ docker run --rm --gpus all -it `
   my-triton-faster-whisper:latest `
   tritonserver --model-repository=/models
 
+(above for testing, code now able to run)
+docker compose build
+docker compose up 
+(once containers up, media-processor-1 should be waiting for messages)
+
 nvidia-smi
 docker version
 
@@ -65,6 +70,7 @@ EMIT CHANGES;
 (once fine run this)
 docker run -it --network=transcription-project_default edenhill/kcat:1.7.1 -b kafka:9092 -L
 
+(check if kafka stream monitoring minio bucket)
 docker run --rm -it --network=transcription-project_default edenhill/kcat:1.7.1 -b kafka:9092 -t minio-events-v1 -C
 
 
