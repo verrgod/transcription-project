@@ -47,6 +47,8 @@ services:
       retries: 3
     depends_on:
       - kafka
+    networks:
+      - triton-net
 
   mc:
     image: minio/mc
@@ -69,9 +71,11 @@ services:
     depends_on:
       - minio-server
       - kafka-setup
+    networks:
+      - triton-net
 
   kafka:
-    image: confluentinc/cp-kafka
+    image: confluentinc/cp-kafka:7.5.0
     hostname: kafka
     container_name: kafka
     ports:
@@ -79,7 +83,9 @@ services:
       - 29092:29092
     env_file:
       - kafka.env
-  
+    networks:
+      - triton-net
+
   ksqldb-server:
     image: confluentinc/cp-ksqldb-server
     hostname: ksqldb-server
@@ -91,7 +97,9 @@ services:
       - 8088:8088
     env_file:
       - ksql.env
-  
+    networks:
+      - triton-net
+
   ksqldb-cli:
     image: confluentinc/cp-ksqldb-cli
     container_name: ksqldb-cli
@@ -114,6 +122,8 @@ services:
       cat /data/scripts/init.sql <(echo 'EXIT')| ksql http://ksqldb-server:8088
       echo -e "\n\n-> Sleeping…\n"
       sleep infinity     
+    networks:
+      - triton-net
 
   event-consumer:
     image: confluentinc/cp-kafkacat
@@ -126,6 +136,8 @@ services:
                           -t minio-events-v1"
     depends_on:
       - kafka
+    networks:
+      - triton-net
 
   # service for topic creation only, is success must exit 0
   kafka-setup:
@@ -145,6 +157,8 @@ services:
       # We override the image's `command` anyways, hence this container will not start a broker.
       KAFKA_BROKER_ID: ignored
       KAFKA_ZOOKEEPER_CONNECT: ignored
+    networks:
+      - triton-net
 
   media-processor:
     build:
@@ -163,7 +177,7 @@ services:
       MINIO_ACCESS_KEY: minio
       MINIO_SECRET_KEY: minio123
     restart: on-failure
-  
+
   ksqldb-init:
     image: curlimages/curl:7.79.1
     container_name: ksqldb-init
@@ -173,7 +187,8 @@ services:
       - ./ksql-init/init.sql:/init.sql
       - ./ksql-init/ksql-entry.sh:/docker-entrypoint.sh
     entrypoint: ["/bin/sh", "/docker-entrypoint.sh"]
-
+    networks:
+      - triton-net
 
   schema-registry:
     image: confluentinc/cp-schema-registry
@@ -185,3 +200,5 @@ services:
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
     depends_on:
       - kafka
+    networks:
+      - triton-net      

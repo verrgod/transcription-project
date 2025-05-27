@@ -19,7 +19,7 @@ class TritonPythonModel:
                 audio_data = input_tensor.as_numpy()[0].tobytes()
                 logging.debug(f"Audio data length: {len(audio_data)} bytes")
 
-                audio = AudioSegment.from_file(io.BytesIO(audio_data), format="wav")
+                audio = AudioSegment.from_file(io.BytesIO(audio_data), format=None)
                 wav_io = io.BytesIO()
                 audio.export(wav_io, format="wav")
                 wav_io.seek(0)

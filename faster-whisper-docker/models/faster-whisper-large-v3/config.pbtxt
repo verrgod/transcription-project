@@ -4,8 +4,8 @@ max_batch_size: 1
 input [
   {
     name: "AUDIO"
-    data_type: TYPE_STRING
-    dims: [ 1 ]
+    data_type: TYPE_UINT8
+    dims: [ -1 ]    # variable-length 1D array of bytes
   }
 ]
 output [

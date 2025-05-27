@@ -3,10 +3,13 @@
 import json
 import logging
 import requests
+import tritonclient.http as httpclient
+import numpy as np 
 from io import BytesIO
 from minio import Minio
 from confluent_kafka import Consumer, Producer
 from requests.exceptions import RequestException
+from pydub import AudioSegment
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -37,6 +40,12 @@ minio_client = Minio(
     secure=MINIO_CONFIG['secure']
 )
 
+def convert_to_wav_bytes(audio_bytes):
+    audio = AudioSegment.from_file(BytesIO(audio_bytes), format=None)
+    wav_io = BytesIO()
+    audio.export(wav_io, format="wav")
+    return wav_io.getvalue()
+
 def setup_kafka_consumer():
     """Creates and returns a Kafka Consumer instance"""
     consumer = Consumer(KAFKA_CONFIG)
@@ -60,20 +69,22 @@ def retrieve_file_from_minio(bucket_name, file_name):
         return None
 
 def run_inference(audio_bytes):
-    """Run the inference model and return the VTT content"""
-    headers = {
-        "Content-Type": "application/octet-stream",
-        "Inference-Header-Content-Length": "0"
-    }
-    try:
-        response = requests.post(INFERENCE_URL, headers=headers, data=audio_bytes)
-        response.raise_for_status()
-        string_data = response.content.decode('utf-8')
-        vtt_start = string_data.find("WEBVTT")
-        return string_data[vtt_start:] if vtt_start != -1 else ""
-    except RequestException as e:
-        logging.error(f"Inference request failed: {e}")
-        return ""
+    wav_bytes = convert_to_wav_bytes(audio_bytes)
+    audio_np = np.array([np.frombuffer(wav_bytes, dtype=np.uint8)])
+
+    with httpclient.InferenceServerClient(url="triton:8000") as client:
+        inputs = [
+            httpclient.InferInput("AUDIO", audio_np.shape, "UINT8")
+        ]
+        inputs[0].set_data_from_numpy(audio_np)
+
+        outputs = [
+            httpclient.InferRequestedOutput("TRANSCRIPTION")
+        ]
+
+        response = client.infer(model_name="faster-whisper-large-v3", inputs=inputs, outputs=outputs)
+        result = response.as_numpy("TRANSCRIPTION")[0].decode("utf-8")
+        return result
 
 def upload_to_minio(bucket_name, file_name, data, content_type):
     """Upload data to MinIO"""
