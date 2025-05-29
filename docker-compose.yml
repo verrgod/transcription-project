@@ -3,6 +3,17 @@ networks:
     driver: bridge
 
 services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    #networks:
+    #  - triton
+    #depends_on:
+    #  - backend
+
   triton:
     image: my-triton-faster-whisper:latest
     container_name: triton-faster-whisper
