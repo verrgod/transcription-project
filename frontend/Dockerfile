@@ -1,9 +1,13 @@
 # Stage 1: build
 FROM node:18-alpine AS build
 WORKDIR /app
-COPY audio_uploader/ ./
+COPY package*.json ./
 
+RUN apk add --no-cache bash git python3 make g++
 RUN npm install
+
+COPY . . 
+
 RUN npm run build
 
 # Stage 2: serve

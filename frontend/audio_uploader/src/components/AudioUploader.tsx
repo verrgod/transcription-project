@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faUpload } from '@fortawesome/free-solid-svg-icons';
 
 const AudioUploader: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -42,14 +44,18 @@ const AudioUploader: React.FC = () => {
   };
 
    return (
-    <div className="p-4 border rounded shadow-md max-w-md mx-auto">
-      <h2 className="text-lg font-semibold mb-2">Upload an Audio File</h2>
-      <input
-        type="file"
-        accept="audio/*"
-        onChange={handleFileChange}
-        className="mb-2"
-      />
+    <div className="absolute top-4 right-4 z-10">
+      <h2 className="text-lg font-semibold mb-2">Upload audio file here!</h2>
+      <label className="cursor-pointer inline-flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+        <FontAwesomeIcon icon={faUpload} />
+        <span>{uploading ? 'Uploading...' : 'Upload'}</span>
+        <input
+          type="file"
+          accept="audio/*"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+      </label>
       {selectedFile && (
         <p className="text-sm text-gray-600">Selected: {selectedFile.name}</p>
       )}
@@ -58,7 +64,7 @@ const AudioUploader: React.FC = () => {
         disabled={!selectedFile || uploading}
         className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
       >
-        {uploading ? 'Uploading...' : 'Upload'}
+        {uploading ? 'Transcribing...' : 'Transcribe it!'}
       </button>
       {message && <p className="mt-3 text-sm">{message}</p>}
     </div>
