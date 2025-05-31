@@ -89,5 +89,4 @@ curl -v --location --request POST 'http://localhost:8000/v2/models/faster-whispe
 docker run --rm -it --network=transcription-project_default edenhill/kcat:1.7.1 \
   -b kafka:9092 -t minio-events-v1 -C
 
-docker run -it --rm -p 3000:3000 -v C:\Users\Vernon\Desktop\transcription-project\frontend\audio_uploader:/app -w /app node:22-alpine sh
-npm start
+docker run -it --rm -p 3000:3000 -v C:\Users\Vernon\Desktop\transcription-project\frontend\audio_uploader:/app -w /app node:22 sh -c "npm install && npm start"

@@ -5,11 +5,16 @@ networks:
 services:
   frontend:
     build:
-      context: ./frontend
+      context: ./frontend/audio_uploader
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
-    command: sh -c "npm install && npm start"
+    volumes:
+      - ./frontend/audio_uploader:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true  # Helps hot reload in Docker
+    command: npm start
     #networks:
     #  - triton
     #depends_on:
