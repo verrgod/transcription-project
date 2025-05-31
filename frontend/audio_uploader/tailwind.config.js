@@ -5,7 +5,15 @@ module.exports = {
     "./public/index.html"
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ['Epilogue', 'ui-sans-serif', 'system-ui'],
+      },
+      colors: {
+        primary: '#000000',
+        secondary: '#1E1E1E',
+      },
+    },
   },
   plugins: [],
 }
