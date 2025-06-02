@@ -1,5 +1,5 @@
 import React from 'react';
-import AudioUploader from './components/AudioUploader.tsx';
+
 const App: React.FC = () => {
   return (
     <div className="bg-gradient-to-b from-primary to-secondary w-full text-white flex flex-col items-center justify-center">
@@ -19,7 +19,7 @@ const App: React.FC = () => {
         <div className="flex-1">
           <div className="container mx-auto grid lg:grid-cols-2 gap-16 h-full">
 
-            {/* LEFT: Centered Text */}
+            {/* LEFT: Text, CTA */}
             <div className="flex items-center">
               <div className="space-y-6">
                 <h1 className="text-5xl lg:text-6xl font-bold leading-tight">
@@ -38,7 +38,7 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* RIGHT: Cat Image Bottom-Aligned */}
+            {/* RIGHT: Cat Image */}
             <div className="flex items-center justify-center">
               <img
                 src="/images/catHeadphones.png"
