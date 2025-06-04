@@ -15,10 +15,26 @@ services:
     environment:
       - CHOKIDAR_USEPOLLING=true  # Helps hot reload in Docker
     command: npm start
-    #networks:
-    #  - triton
-    #depends_on:
-    #  - backend
+    networks:
+      - triton-net
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./media_processor  # adjust to wherever your FastAPI code lives
+      dockerfile: Dockerfile
+    container_name: fastapi-backend
+    ports:
+      - "8080:8000"  # Exposes FastAPI on host port 8080
+    depends_on:
+      - minio-server
+    networks:
+      - triton-net
+    environment:
+      MINIO_ENDPOINT: minio-server:9000
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
 
   triton:
     image: my-triton-faster-whisper:latest

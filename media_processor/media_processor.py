@@ -5,11 +5,14 @@ import logging
 import requests
 import tritonclient.http as httpclient
 import numpy as np 
+import os
 from io import BytesIO
 from minio import Minio
+from minio.error import S3Error
 from confluent_kafka import Consumer, Producer
 from requests.exceptions import RequestException
 from pydub import AudioSegment
+from fastapi import File, UploadFile, APIRouter
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -31,6 +34,8 @@ MINIO_CONFIG = {
 }
 
 INFERENCE_URL = "http://triton:8000/v2/models/faster-whisper-large-v3/infer"
+
+router = APIRouter()
 
 # MinIO Client
 minio_client = Minio(
@@ -86,20 +91,38 @@ def run_inference(audio_bytes):
         result = response.as_numpy("TRANSCRIPTION")[0].decode("utf-8")
         return result
 
-def upload_to_minio(bucket_name, file_name, data, content_type):
-    """Upload data to MinIO"""
-    if not minio_client.bucket_exists(bucket_name):
-        minio_client.make_bucket(bucket_name)
-        logging.info(f"Bucket {bucket_name} created.")
-    vtt_stream = BytesIO(data)
-    minio_client.put_object(
-        bucket_name,
-        file_name,
-        vtt_stream,
-        len(data),
-        content_type=content_type
+@router.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    contents = await file.read()
+
+    await upload_to_minio(
+        bucket_name="media",
+        file_name=file.filename,
+        data=contents,
+        content_type=file.content_type
     )
-    logging.info(f"Uploaded {file_name} to {bucket_name}.")
+    return {"message": "File uploaded", "filename": file.filename} 
+            
+async def upload_to_minio(bucket_name, file_name, data, content_type):
+
+    try:
+        """Upload data to MinIO"""
+        if not minio_client.bucket_exists(bucket_name):
+            minio_client.make_bucket(bucket_name)
+            logging.info(f"Bucket {bucket_name} created.")
+
+        vtt_stream = BytesIO(data)
+        minio_client.put_object(
+            bucket_name,
+            file_name,
+            vtt_stream,
+            len(data),
+            content_type=content_type
+        )
+        logging.info(f"Uploaded {file_name} to {bucket_name}.")
+    except S3Error as error:
+        logging.error(f"MinIO upload error: {error}")
+        raise
 
 def process_message(message, producer):
     """Process a Kafka message"""

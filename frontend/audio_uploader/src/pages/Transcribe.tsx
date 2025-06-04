@@ -2,15 +2,18 @@ import React from 'react';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import { toast, ToastContainer } from 'react-toastify';
 import { useRef } from "react";
+import axios from "axios";
 
 const Transcribe: React.FC = () => {
+    const backendURL = "http://backend:8000/upload";
+    
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleButtonClick = () => {
         fileInputRef.current?.click();
     };
 
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
@@ -20,15 +23,23 @@ const Transcribe: React.FC = () => {
             event.target.value = ""; // reset input
             return;
         }
-        toast.success("File successfully uploaded!");
+        toast.info("Uploading file...");
 
         const formData = new FormData();
         formData.append("file", file);
 
         console.log(formData)
         // fetch below
-
-
+        try {
+            const response = await axios.post(backendURL, formData, {
+                headers: { "Content-Type": "multipart/form-data" }
+            });
+            toast.success(response.data.filename + " uploaded!");
+        }
+        catch (error) { 
+            toast.error("Upload failed!");
+            console.error("Upload error: ", error);
+        }
     };
 
     return (
