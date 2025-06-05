@@ -9,9 +9,11 @@ from minio import Minio
 from minio.error import S3Error
 from confluent_kafka import Consumer, Producer
 from pydub import AudioSegment
-from fastapi import FastAPI, File, UploadFile, APIRouter, HTTPException
+from fastapi import FastAPI, File, APIRouter, HTTPException, Query
 from threading import Thread
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -39,7 +41,7 @@ router = APIRouter()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Or restrict to ["http://localhost:3000"]
+    allow_origins=["http://localhost:3000"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -183,7 +185,21 @@ def upload_file(file: bytes = File(...), filename: str = File(...)):
         logging.exception("Upload failed")
         raise HTTPException(status_code=500, detail=str(e))
     
-@router.on_event("startup")
+@router.get("/vtt-ready")
+def receieve_file(filename: str = Query(...)):
+    try:
+        vtt_file = f"{filename}.vtt"
+        response = minio_client.get_object("media-vtt", vtt_file)
+        content = response.read().decode("utf-8")
+        response.close()
+        response.release_conn()
+
+        return PlainTextResponse(content, media_type="text/vtt")
+    
+    except S3Error as error:
+        return HTTPException(status_code=404, detail=f"VTT file not found: {vtt_file}")
+    
+@app.on_event("startup")
 def startup_event():
     thread = Thread(target=kafka_loop, daemon=True)
     thread.start()
