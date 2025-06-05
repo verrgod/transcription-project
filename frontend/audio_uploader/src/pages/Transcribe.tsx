@@ -1,13 +1,16 @@
 import React from 'react';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import { toast, ToastContainer } from 'react-toastify';
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import axios from "axios";
 
 const Transcribe: React.FC = () => {
     const backendURL = "http://localhost:8080/upload";
-    
+
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const [vttText, setVttText] = useState("")
+    const [isLoading, setIsLoading] = useState(false);
 
     const handleButtonClick = () => {
         fileInputRef.current?.click();
@@ -28,17 +31,42 @@ const Transcribe: React.FC = () => {
         const formData = new FormData();
         formData.append("file", file);
         formData.append("filename", file.name);
-        
+
         console.log(formData)
-        // fetch below
+
         try {
             const response = await axios.post(backendURL, formData);
             toast.success(response.data.filename + " uploaded!");
-        }
-        catch (error) { 
+            setIsLoading(true);
+
+            const filename = response.data.filename;
+            await fetchVTT(filename);  // Only call once
+        } catch (error) {
             toast.error("Upload failed!");
-            console.error("Upload error: ", error);
         }
+    };
+
+    const fetchVTT = async (filename: string) => {
+        setIsLoading(true)
+        try {
+            const res = await axios.get("http://localhost:8080/vtt-ready", {
+                params: { filename },
+            });
+
+            if (res.data.ready) {
+                setVttText(res.data);
+                setIsLoading(false);
+                toast.success("Transcription complete!");
+                return;
+            }
+        } catch (error) {
+            console.error("Polling failed:", error);
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 3000)); // wait 3s
+
+        toast.error("Transcription timed out.");
+        setIsLoading(false);
     };
 
     return (
@@ -106,6 +134,26 @@ const Transcribe: React.FC = () => {
                         <div className="text-center text-gray-500 italic">
                             Audio playback area (coming soon)
                         </div>
+                        {isLoading ? (
+                            <div className="mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300 animate-pulse">
+                                <h2 className="text-lg font-semibold mb-2">Transcript</h2>
+                                <div className="space-y-2">
+                                    <div className="h-4 bg-gray-700 rounded w-3/4"></div>
+                                    <div className="h-4 bg-gray-700 rounded w-2/3"></div>
+                                    <div className="h-4 bg-gray-700 rounded w-5/6"></div>
+                                    <div className="h-4 bg-gray-700 rounded w-1/2"></div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300">
+                                <h2 className="text-lg font-semibold mb-2">Transcript</h2>
+                                {vttText ? (
+                                    <pre className="whitespace-pre-wrap text-sm text-gray-400">{vttText}</pre>
+                                ) : (
+                                    <p className="italic text-gray-500">Transcript will appear here once processed.</p>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
