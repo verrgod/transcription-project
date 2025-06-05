@@ -15,12 +15,15 @@ services:
     environment:
       - CHOKIDAR_USEPOLLING=true  # Helps hot reload in Docker
     command: npm start
-    #networks:
-    #  - triton
-    #depends_on:
-    #  - backend
+    networks:
+      - triton-net
+    depends_on:
+      - media-processor
 
   triton:
+    build: 
+      context: ./faster-whisper-docker
+      dockerfile: Dockerfile
     image: my-triton-faster-whisper:latest
     container_name: triton-faster-whisper
     command: tritonserver --model-repository=/models
@@ -181,6 +184,8 @@ services:
     build:
       context: ./media_processor
       dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
     networks:
       - triton-net
     depends_on:

@@ -2,14 +2,16 @@
 #!/usr/bin/env python
 import json
 import logging
-import requests
 import tritonclient.http as httpclient
 import numpy as np 
 from io import BytesIO
 from minio import Minio
+from minio.error import S3Error
 from confluent_kafka import Consumer, Producer
-from requests.exceptions import RequestException
 from pydub import AudioSegment
+from fastapi import FastAPI, File, UploadFile, APIRouter, HTTPException
+from threading import Thread
+from fastapi.middleware.cors import CORSMiddleware
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -31,6 +33,17 @@ MINIO_CONFIG = {
 }
 
 INFERENCE_URL = "http://triton:8000/v2/models/faster-whisper-large-v3/infer"
+
+app = FastAPI()
+router = APIRouter()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Or restrict to ["http://localhost:3000"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # MinIO Client
 minio_client = Minio(
@@ -85,21 +98,27 @@ def run_inference(audio_bytes):
         response = client.infer(model_name="faster-whisper-large-v3", inputs=inputs, outputs=outputs)
         result = response.as_numpy("TRANSCRIPTION")[0].decode("utf-8")
         return result
-
+    
 def upload_to_minio(bucket_name, file_name, data, content_type):
-    """Upload data to MinIO"""
-    if not minio_client.bucket_exists(bucket_name):
-        minio_client.make_bucket(bucket_name)
-        logging.info(f"Bucket {bucket_name} created.")
-    vtt_stream = BytesIO(data)
-    minio_client.put_object(
-        bucket_name,
-        file_name,
-        vtt_stream,
-        len(data),
-        content_type=content_type
-    )
-    logging.info(f"Uploaded {file_name} to {bucket_name}.")
+
+    try:
+        """Upload data to MinIO"""
+        if not minio_client.bucket_exists(bucket_name):
+            minio_client.make_bucket(bucket_name)
+            logging.info(f"Bucket {bucket_name} created.")
+
+        vtt_stream = BytesIO(data)
+        minio_client.put_object(
+            bucket_name,
+            file_name,
+            vtt_stream,
+            len(data),
+            content_type=content_type
+        )
+        logging.info(f"Uploaded {file_name} to {bucket_name}.")
+    except S3Error as error:
+        logging.error(f"MinIO upload error: {error}")
+        raise
 
 def process_message(message, producer):
     """Process a Kafka message"""
@@ -125,7 +144,7 @@ def process_message(message, producer):
             producer.flush()
             logging.info(f"Produced event for {dest_name}")
 
-def main():
+def kafka_loop():
     """Main function to run the Kafka consumer loop"""
     consumer = setup_kafka_consumer()
     producer = setup_kafka_producer()
@@ -150,5 +169,24 @@ def main():
     finally:
         consumer.close()
 
-if __name__ == '__main__':
-    main()
+@router.post("/upload")
+def upload_file(file: bytes = File(...), filename: str = File(...)):
+    try:
+        upload_to_minio(
+            bucket_name="media",
+            file_name=filename,
+            data=file,
+            content_type="application/octet-stream"
+        )
+        return {"message": "File uploaded", "filename": filename} 
+    except Exception as e:
+        logging.exception("Upload failed")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.on_event("startup")
+def startup_event():
+    thread = Thread(target=kafka_loop, daemon=True)
+    thread.start()
+
+app.include_router(router)
+
