@@ -2,17 +2,15 @@
 #!/usr/bin/env python
 import json
 import logging
-import requests
 import tritonclient.http as httpclient
 import numpy as np 
-import os
 from io import BytesIO
 from minio import Minio
 from minio.error import S3Error
 from confluent_kafka import Consumer, Producer
-from requests.exceptions import RequestException
 from pydub import AudioSegment
-from fastapi import File, UploadFile, APIRouter
+from fastapi import FastAPI, File, UploadFile, APIRouter, HTTPException
+from threading import Thread
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -35,6 +33,7 @@ MINIO_CONFIG = {
 
 INFERENCE_URL = "http://triton:8000/v2/models/faster-whisper-large-v3/infer"
 
+app = FastAPI()
 router = APIRouter()
 
 # MinIO Client
@@ -90,19 +89,7 @@ def run_inference(audio_bytes):
         response = client.infer(model_name="faster-whisper-large-v3", inputs=inputs, outputs=outputs)
         result = response.as_numpy("TRANSCRIPTION")[0].decode("utf-8")
         return result
-
-@router.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
-    contents = await file.read()
-
-    await upload_to_minio(
-        bucket_name="media",
-        file_name=file.filename,
-        data=contents,
-        content_type=file.content_type
-    )
-    return {"message": "File uploaded", "filename": file.filename} 
-            
+    
 async def upload_to_minio(bucket_name, file_name, data, content_type):
 
     try:
@@ -148,7 +135,7 @@ def process_message(message, producer):
             producer.flush()
             logging.info(f"Produced event for {dest_name}")
 
-def main():
+def kafka_loop():
     """Main function to run the Kafka consumer loop"""
     consumer = setup_kafka_consumer()
     producer = setup_kafka_producer()
@@ -173,5 +160,26 @@ def main():
     finally:
         consumer.close()
 
-if __name__ == '__main__':
-    main()
+@router.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    contents = await file.read()
+
+    try:
+        await upload_to_minio(
+            bucket_name="media",
+            file_name=file.filename,
+            data=contents,
+            content_type=file.content_type
+        )
+        return {"message": "File uploaded", "filename": file.filename} 
+    except Exception as e:
+        logging.exception("Upload failed")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.on_event("startup")
+def startup_event():
+    thread = Thread(target=kafka_loop, daemon=True)
+    thread.start()
+
+app.include_router(router)
+

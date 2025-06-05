@@ -1,5 +1,7 @@
 FROM python:3.12
 
+WORKDIR /app
+
 ADD media_processor.py .
 
 RUN pip install requests minio confluent_kafka && \
@@ -8,4 +10,6 @@ RUN pip install requests minio confluent_kafka && \
     apt-get update && apt-get install -y ffmpeg && \
     pip install fastapi uvicorn[standard] python-multipart
 
-CMD ["python", "./media_processor.py"]
+EXPOSE 8080
+
+CMD ["uvicorn", "media_processor:app", "--host", "0.0.0.0", "--port", "8080"]

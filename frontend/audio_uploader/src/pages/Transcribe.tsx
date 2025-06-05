@@ -5,7 +5,7 @@ import { useRef } from "react";
 import axios from "axios";
 
 const Transcribe: React.FC = () => {
-    const backendURL = "http://backend:8000/upload";
+    const backendURL = "http://media-processor:8080/upload";
     
     const fileInputRef = useRef<HTMLInputElement>(null);
 
