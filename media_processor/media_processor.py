@@ -189,11 +189,13 @@ def upload_file(file: bytes = File(...), filename: str = File(...)):
 def receieve_file(filename: str = Query(...)):
     try:
         vtt_file = f"{filename}.vtt"
-        response = minio_client.stat_object("media-vtt", vtt_file)
+        response = minio_client.get_object("media-vtt", vtt_file)
         content = response.read().decode("utf-8")
         response.close()
         response.release_conn()
+
         return PlainTextResponse(content, media_type="text/vtt")
+    
     except S3Error as error:
         return HTTPException(status_code=404, detail=f"VTT file not found: {vtt_file}")
     

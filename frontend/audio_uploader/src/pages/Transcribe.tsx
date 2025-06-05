@@ -48,23 +48,26 @@ const Transcribe: React.FC = () => {
 
     const fetchVTT = async (filename: string) => {
         setIsLoading(true)
-        try {
-            const res = await axios.get("http://localhost:8080/vtt-ready", {
-                params: { filename },
-            });
+        let attempts = 0;
+        const maxAttempts = 20;
 
-            if (res.data.ready) {
-                setVttText(res.data);
-                setIsLoading(false);
-                toast.success("Transcription complete!");
-                return;
+        while (attempts < maxAttempts) {
+            try {
+                const res = await axios.get("http://localhost:8080/vtt-ready", {
+                    params: { filename },
+                });
+
+                if (res.status == 200 && typeof res.data == "string") {
+                    setVttText(res.data);
+                    setIsLoading(false);
+                    toast.success("Transcription complete!");
+                    return;
+                }
+            } catch (error) {
+                console.error("Polling failed:", error);
             }
-        } catch (error) {
-            console.error("Polling failed:", error);
+            await new Promise((resolve) => setTimeout(resolve, 3000)); // wait 3s
         }
-
-        await new Promise((resolve) => setTimeout(resolve, 3000)); // wait 3s
-
         toast.error("Transcription timed out.");
         setIsLoading(false);
     };
