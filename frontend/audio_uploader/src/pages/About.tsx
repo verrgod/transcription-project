@@ -5,7 +5,7 @@ const About: React.FC = () => {
         <div className="bg-gradient-to-b from-primary to-secondary w-full text-white flex flex-col items-center justify-center">
 
             {/* fullscreen grid layout */}
-            <div className="min-h-screen flex flex-col">
+            <div className="pt-nav min-h-screen-minus-nav flex flex-col items-center justify-center">
                 <div className="container mx-auto grid lg:grid-cols-2 gap-16">
                     {/* LEFT: Text, CTA */}
                     <div className="flex items-center">
@@ -18,11 +18,6 @@ const About: React.FC = () => {
                             <p className="hover:cursor-default text-xl text-gray-300 leading-relaxed">
                                 I love music.
                             </p>
-                            <div className="opacity-0">
-                                <button className="px-8 py-4 rounded-full text-lg font-semibold cursor-default">
-                                    Invisible
-                                </button>
-                            </div>
                         </div>
                     </div>
 

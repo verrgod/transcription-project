@@ -6,6 +6,12 @@ module.exports = {
   ],
   theme: {
     extend: {
+      minHeight: {
+        'screen-minus-nav': 'calc(100vh - 4.75rem)',
+      },
+      padding: {
+        'nav': '4.75rem',
+      },
       fontFamily: {
         sans: ['Epilogue', 'ui-sans-serif', 'system-ui'],
       },
