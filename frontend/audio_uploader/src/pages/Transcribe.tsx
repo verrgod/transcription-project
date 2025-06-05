@@ -5,7 +5,7 @@ import { useRef } from "react";
 import axios from "axios";
 
 const Transcribe: React.FC = () => {
-    const backendURL = "http://media-processor:8080/upload";
+    const backendURL = "http://localhost:8080/upload";
     
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -27,13 +27,12 @@ const Transcribe: React.FC = () => {
 
         const formData = new FormData();
         formData.append("file", file);
-
+        formData.append("filename", file.name);
+        
         console.log(formData)
         // fetch below
         try {
-            const response = await axios.post(backendURL, formData, {
-                headers: { "Content-Type": "multipart/form-data" }
-            });
+            const response = await axios.post(backendURL, formData);
             toast.success(response.data.filename + " uploaded!");
         }
         catch (error) { 

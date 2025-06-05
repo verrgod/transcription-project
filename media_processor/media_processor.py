@@ -11,6 +11,7 @@ from confluent_kafka import Consumer, Producer
 from pydub import AudioSegment
 from fastapi import FastAPI, File, UploadFile, APIRouter, HTTPException
 from threading import Thread
+from fastapi.middleware.cors import CORSMiddleware
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -35,6 +36,14 @@ INFERENCE_URL = "http://triton:8000/v2/models/faster-whisper-large-v3/infer"
 
 app = FastAPI()
 router = APIRouter()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Or restrict to ["http://localhost:3000"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # MinIO Client
 minio_client = Minio(
@@ -90,7 +99,7 @@ def run_inference(audio_bytes):
         result = response.as_numpy("TRANSCRIPTION")[0].decode("utf-8")
         return result
     
-async def upload_to_minio(bucket_name, file_name, data, content_type):
+def upload_to_minio(bucket_name, file_name, data, content_type):
 
     try:
         """Upload data to MinIO"""
@@ -161,22 +170,20 @@ def kafka_loop():
         consumer.close()
 
 @router.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
-    contents = await file.read()
-
+def upload_file(file: bytes = File(...), filename: str = File(...)):
     try:
-        await upload_to_minio(
+        upload_to_minio(
             bucket_name="media",
-            file_name=file.filename,
-            data=contents,
-            content_type=file.content_type
+            file_name=filename,
+            data=file,
+            content_type="application/octet-stream"
         )
-        return {"message": "File uploaded", "filename": file.filename} 
+        return {"message": "File uploaded", "filename": filename} 
     except Exception as e:
         logging.exception("Upload failed")
         raise HTTPException(status_code=500, detail=str(e))
     
-@app.on_event("startup")
+@router.on_event("startup")
 def startup_event():
     thread = Thread(target=kafka_loop, daemon=True)
     thread.start()
