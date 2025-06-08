@@ -96,15 +96,14 @@ const Transcribe: React.FC = () => {
             />
 
             {/* fullscreen grid layout */}
-            <div className="h-screen flex flex-col">
+            <div className="w-full pt-nav min-h-screen-minus-nav flex flex-col">
 
                 {/* nav */}
-                <div className="flex-1">
-                    <div className="container mx-auto mt-20 px-6">
-                        <div className="flex flex-wrap items-start justify-between py-12 gap-6">
+                    <div className="container mx-auto px-4 grid grid-rows-3 grid-flow-row gap-4">
+                        <div className="flex flex-wrap items-center justify-center py-12 gap-4 row-span-1">
 
                             {/* Left: Title and description */}
-                            <div className="max-w-4xl flex-1 min-w-[280px]">
+                            <div className="max-w-xl flex-1 min-w-[280px]">
                                 <h1 className="text-5xl lg:text-6xl font-bold leading-tight">
                                     <span className="hover:cursor-default bg-gradient-to-r from-white via-purple-200 to-purple-400 bg-clip-text text-transparent">
                                         Audio Playback
@@ -129,34 +128,35 @@ const Transcribe: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                    </div>
 
                     {/* Bottom: Audio Playback Placeholder */}
-                    <div className="flex-[3] bg-gray-850 px-6 py-12 border-t border-gray-700">
+                    <div className="bg-gray-850 px-6 py-12 border-t border-gray-700 row-span-2">
                         {/* Future Audio Playback Component Goes Here */}
-                        <div className="text-center text-gray-500 italic">
-                            Audio playback area (coming soon)
-                        </div>
-                        {isLoading ? (
-                            <div className="mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300 animate-pulse">
-                                <h2 className="text-lg font-semibold mb-2">Transcript</h2>
-                                <div className="space-y-2">
-                                    <div className="h-4 bg-gray-700 rounded w-3/4"></div>
-                                    <div className="h-4 bg-gray-700 rounded w-2/3"></div>
-                                    <div className="h-4 bg-gray-700 rounded w-5/6"></div>
-                                    <div className="h-4 bg-gray-700 rounded w-1/2"></div>
+                        <div className='container mx-auto grid lg:grid-cols-3 gap-16 h-full'>
+                            <div className="mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300 text-center text-gray-500 italic col-span-2">
+                                Audio playback area (coming soon)
+                            </div>
+                            {isLoading ? (
+                                <div className="mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300 animate-pulse">
+                                    <h2 className="text-lg font-semibold mb-2">Transcript</h2>
+                                    <div className="space-y-2">
+                                        <div className="h-4 bg-gray-700 rounded w-3/4"></div>
+                                        <div className="h-4 bg-gray-700 rounded w-2/3"></div>
+                                        <div className="h-4 bg-gray-700 rounded w-5/6"></div>
+                                        <div className="h-4 bg-gray-700 rounded w-1/2"></div>
+                                    </div>
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300">
-                                <h2 className="text-lg font-semibold mb-2">Transcript</h2>
-                                {vttText ? (
-                                    <pre className="whitespace-pre-wrap text-sm text-gray-400">{vttText}</pre>
-                                ) : (
-                                    <p className="italic text-gray-500">Transcript will appear here once processed.</p>
-                                )}
-                            </div>
-                        )}
+                            ) : (
+                                <div className="mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300">
+                                    <h2 className="text-lg font-semibold mb-2">Transcript</h2>
+                                    {vttText ? (
+                                        <pre className="whitespace-pre-wrap text-sm text-gray-400">{vttText}</pre>
+                                    ) : (
+                                        <p className="italic text-gray-500">Transcript will appear here once processed.</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
