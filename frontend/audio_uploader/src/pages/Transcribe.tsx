@@ -132,12 +132,14 @@ const Transcribe: React.FC = () => {
                     {/* Bottom: Audio Playback Placeholder */}
                     <div className="bg-gray-850 px-6 py-12 border-t border-gray-700 row-span-2">
                         {/* Future Audio Playback Component Goes Here */}
-                        <div className='container mx-auto grid lg:grid-cols-3 gap-16 h-full'>
+                        <div className='container mx-auto grid lg:grid-cols-3 gap-16 h-80'>
                             <div className="mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300 text-center text-gray-500 italic col-span-2">
                                 Audio playback area (coming soon)
                             </div>
+
+                            {/* subtitle column (loading animation & injecting of transcription)*/}
                             {isLoading ? (
-                                <div className="mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300 animate-pulse">
+                                <div className="h-80 mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300 animate-pulse">
                                     <h2 className="text-lg font-semibold mb-2">Transcript</h2>
                                     <div className="space-y-2">
                                         <div className="h-4 bg-gray-700 rounded w-3/4"></div>
@@ -147,7 +149,7 @@ const Transcribe: React.FC = () => {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300">
+                                <div className="h-80 overflow-y-auto overscroll-contain mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300">
                                     <h2 className="text-lg font-semibold mb-2">Transcript</h2>
                                     {vttText ? (
                                         <pre className="whitespace-pre-wrap text-sm text-gray-400">{vttText}</pre>
