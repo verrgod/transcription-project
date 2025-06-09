@@ -4,6 +4,9 @@ import json
 import logging
 import tritonclient.http as httpclient
 import numpy as np 
+import re
+import unicodedata
+import os 
 from io import BytesIO
 from minio import Minio
 from minio.error import S3Error
@@ -54,6 +57,19 @@ minio_client = Minio(
     secret_key=MINIO_CONFIG['secret_key'],
     secure=MINIO_CONFIG['secure']
 )
+
+def sanitize_filename(filename: str, max_length: int = 100) -> str:
+    # Strip directory parts to avoid path traversal
+    filename = os.path.basename(filename)
+
+    # Normalize to ASCII
+    filename = unicodedata.normalize("NFKD", filename).encode("ascii", "ignore").decode("ascii")
+
+    # Remove dangerous/special characters and keep common ones
+    filename = re.sub(r"[^\w.\-]", "_", filename)
+
+    # Optionally limit filename length
+    return filename[:max_length]
 
 def convert_to_wav_bytes(audio_bytes):
     audio = AudioSegment.from_file(BytesIO(audio_bytes), format=None)
@@ -174,13 +190,14 @@ def kafka_loop():
 @router.post("/upload")
 def upload_file(file: bytes = File(...), filename: str = File(...)):
     try:
+        sanitized_filename = sanitize_filename(filename)
         upload_to_minio(
             bucket_name="media",
-            file_name=filename,
+            file_name=sanitized_filename,
             data=file,
             content_type="application/octet-stream"
         )
-        return {"message": "File uploaded", "filename": filename} 
+        return {"message": "File uploaded", "filename": sanitized_filename} 
     except Exception as e:
         logging.exception("Upload failed")
         raise HTTPException(status_code=500, detail=str(e))
