@@ -20,8 +20,8 @@ Upload audio file (mp3, wav etc.)
 New MinIO bucket created with .vtt file that includes transcription with timestamps. 
 
 **Features**
-Audio transcription
+- Audio transcription
 
-Dynamic subtitling
+- Dynamic subtitling
 
-Audio playback and controls
+- Audio playback and controls
