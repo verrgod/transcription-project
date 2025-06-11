@@ -18,3 +18,10 @@ docker compose up --build
 Open MinIO as opened in port 9000.
 Upload audio file (mp3, wav etc.)
 New MinIO bucket created with .vtt file that includes transcription with timestamps. 
+
+**Features**
+Audio transcription
+
+Dynamic subtitling
+
+Audio playback and controls
