@@ -7,6 +7,8 @@ import numpy as np
 import re
 import unicodedata
 import os 
+import time
+import socket
 from io import BytesIO
 from minio import Minio
 from minio.error import S3Error
@@ -16,6 +18,7 @@ from fastapi import FastAPI, File, APIRouter, HTTPException, Query
 from threading import Thread
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
+from tritonclientutils import InferenceServerException
 
 
 # Set up logging
@@ -103,19 +106,26 @@ def run_inference(audio_bytes):
     wav_bytes = convert_to_wav_bytes(audio_bytes)
     audio_np = np.array([np.frombuffer(wav_bytes, dtype=np.uint8)])
 
-    with httpclient.InferenceServerClient(url="triton:8000") as client:
-        inputs = [
-            httpclient.InferInput("AUDIO", audio_np.shape, "UINT8")
-        ]
-        inputs[0].set_data_from_numpy(audio_np)
+    try:
+        with httpclient.InferenceServerClient(url="triton:8000") as client:
+            inputs = [
+                httpclient.InferInput("AUDIO", audio_np.shape, "UINT8")
+            ]
+            inputs[0].set_data_from_numpy(audio_np)
 
-        outputs = [
-            httpclient.InferRequestedOutput("TRANSCRIPTION")
-        ]
+            outputs = [
+                httpclient.InferRequestedOutput("TRANSCRIPTION")
+            ]
 
-        response = client.infer(model_name="faster-whisper-large-v3", inputs=inputs, outputs=outputs)
-        result = response.as_numpy("TRANSCRIPTION")[0].decode("utf-8")
-        return result
+            response = client.infer(model_name="faster-whisper-large-v3", inputs=inputs, outputs=outputs)
+            result = response.as_numpy("TRANSCRIPTION")[0].decode("utf-8")
+            return result
+    except (InferenceServerException, TimeoutError, socket.timeout) as e:
+        logging.error(f"Inference error: {e}")
+        return None
+    except Exception as e:
+        logging.exception("Unexpected error during inference")
+        return None
     
 def upload_to_minio(bucket_name, file_name, data, content_type):
 
@@ -155,12 +165,16 @@ def process_message(message, producer):
     if audio_bytes:
         wav_bytes = convert_to_wav_bytes(audio_bytes)
         vtt_content = run_inference(wav_bytes)
+        if vtt_content is None:
+            logging.warning(f"Failed to process audio file: {file_name}")
+            return
         if vtt_content:
             dest_name = f'{file_name}.vtt'
             upload_to_minio('media-vtt', dest_name, vtt_content.encode('utf-8'), 'text/vtt')
             producer.produce("vtt-upload", 'testing', dest_name)
             producer.flush()
             logging.info(f"Produced event for {dest_name}")
+            
 
 def kafka_loop():
     """Main function to run the Kafka consumer loop"""
@@ -184,8 +198,12 @@ def kafka_loop():
             process_message(message, producer)
     except KeyboardInterrupt:
         logging.info("Shutting down...")
+    except Exception as e:
+        logging.exception(f"Error in Kafka loop: {e}")
+        time.sleep(1)  # Optional: wait before retrying
     finally:
         consumer.close()
+
 
 @router.post("/upload")
 def upload_file(file: bytes = File(...), filename: str = File(...)):
@@ -202,6 +220,7 @@ def upload_file(file: bytes = File(...), filename: str = File(...)):
         logging.exception("Upload failed")
         raise HTTPException(status_code=500, detail=str(e))
     
+    
 @router.get("/vtt-ready")
 def receieve_file(filename: str = Query(...)):
     try:
@@ -214,7 +233,8 @@ def receieve_file(filename: str = Query(...)):
         return PlainTextResponse(content, media_type="text/vtt")
     
     except S3Error as error:
-        return HTTPException(status_code=404, detail=f"VTT file not found: {vtt_file}")
+        raise HTTPException(status_code=404, detail=f"VTT file not found: {vtt_file}")
+    
     
 @app.on_event("startup")
 def startup_event():
