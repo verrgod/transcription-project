@@ -156,8 +156,8 @@ const Transcribe: React.FC = () => {
                             >
                                 <i className="fas fa-upload relative z-10"></i>
                                 <span className="relative z-10">Upload</span>
-                                <div className="absolute inset-0 rounded-md bg-gradient-to-r from-purple-500 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                                <div className="absolute inset-0 rounded-md bg-white/20 opacity-0 group-hover:animate-ping" />
+                                <div className="absolute inset-0 rounded-md bg-gradient-to-r from-purple-500 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"/>
+                                <div className="absolute inset-0 rounded-md bg-white/20 opacity-0 group-hover:animate-ping"/>
                             </button>
                         </div>
                     </div>
@@ -165,19 +165,21 @@ const Transcribe: React.FC = () => {
                     {/* Bottom: Audio Playback Placeholder */}
                     <div className="bg-gray-850 px-6 py-12 border-t border-gray-700 row-span-2">
                         {/* Future Audio Playback Component Goes Here */}
-                        <div className='container mx-auto grid lg:grid-cols-3 gap-16 h-80'>
-                            <div className="relative mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300 text-center text-gray-500 italic col-span-2">
+                        <div className='container mx-auto flex flex-col grid lg:grid-cols-3 gap-16 h-[calc(60vh-20rem)]'>
+                            <div className="relative flex-grow mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300 text-center text-gray-500 italic lg:col-span-2">
                                 Audio playback area (coming soon)
                                 {/* Progress Bar */}
-                                <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 w-2/3 bg-white rounded h-2 m-2">
-                                    <div
-                                        className="bg-purple-500 h-2 rounded"
-                                        style={{ width: `${(currentTime / duration) * 100 || 0}%` }}
-                                    />
+                                <div className="absolute inset-x-0 md:-bottom-8 lg:bottom-12 flex justify-center">
+                                    <div className="w-2/3 bg-white rounded h-2 m-2">
+                                        <div
+                                            className="bg-purple-500 h-2 rounded"
+                                            style={{ width: `${(currentTime / duration) * 100 || 0}%` }}
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* Controls */}
-                                <div className="absolute inset-x-0 bottom-0 flex justify-center gap-6 p-4">
+                                <div className="absolute inset-x-0 md:-bottom-20 lg:bottom-0 flex justify-center gap-6 p-4">
                                     <button
                                         onClick={handleRewind}
                                         className="text-white hover:text-purple-400 transition"
@@ -205,7 +207,7 @@ const Transcribe: React.FC = () => {
 
                             {/* subtitle column (loading animation & injecting of transcription)*/}
                             {isLoading ? (
-                                <div className="h-80 mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300 animate-pulse">
+                                <div className="h-[calc(60vh-20rem)] mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300 animate-pulse">
                                     <h2 className="text-lg font-semibold mb-2">Transcript</h2>
                                     <div className="space-y-2">
                                         <div className="h-4 bg-gray-700 rounded w-3/4"></div>
@@ -215,10 +217,10 @@ const Transcribe: React.FC = () => {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="h-80 overflow-y-auto overscroll-contain mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300">
+                                <div className="text-center flex-grow h-[calc(60vh-20rem)] overflow-y-auto overscroll-contain mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300">
                                     <h2 className="text-lg font-semibold mb-2">Transcript</h2>
                                     {vttText ? (
-                                        <pre className="whitespace-pre-wrap text-sm text-gray-400">{vttText}</pre>
+                                        <pre className="whitespace-pre-wrap text-sm text-gray-400 mx-auto">{vttText}</pre>
                                     ) : (
                                         <p className="italic text-gray-500">Transcript will appear here once processed.</p>
                                     )}
