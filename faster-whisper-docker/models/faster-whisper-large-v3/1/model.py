@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 class TritonPythonModel:
     def initialize(self, args):
-        self.model = WhisperModel("large-v3")
+        self.model = WhisperModel("large-v3", device="cpu", compute_type="int8")
 
     def execute(self, requests):
         responses = []

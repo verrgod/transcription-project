@@ -2,7 +2,7 @@ FROM python:3.12
 
 WORKDIR /app
 
-ADD media_processor.py .
+COPY . . 
 
 RUN pip install requests minio confluent_kafka && \
     pip install tritonclient[http] && \
