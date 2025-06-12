@@ -89,7 +89,7 @@ const Transcribe: React.FC = () => {
                     params: { filename },
                 });
 
-                if (res.status == 200 && typeof res.data == "string") {
+                if (res.status == 200 && typeof res.data == "string" && res.data.trim() !== "") {
                     setVttText(res.data);
                     setIsLoading(false);
                     toast.success("Transcription complete!");
@@ -98,6 +98,7 @@ const Transcribe: React.FC = () => {
             } catch (error) {
                 console.error("Polling failed:", error);
             }
+            attempts += 1
             await new Promise((resolve) => setTimeout(resolve, 3000)); // wait 3s
         }
         toast.error("Transcription timed out.");

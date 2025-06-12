@@ -214,7 +214,7 @@ def receieve_file(filename: str = Query(...)):
         return PlainTextResponse(content, media_type="text/vtt")
     
     except S3Error as error:
-        return HTTPException(status_code=404, detail=f"VTT file not found: {vtt_file}")
+        raise HTTPException(status_code=404, detail=f"VTT file not found: {vtt_file}")
     
 @app.on_event("startup")
 def startup_event():
