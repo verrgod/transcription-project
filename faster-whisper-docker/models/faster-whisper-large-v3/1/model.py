@@ -26,13 +26,12 @@ class TritonPythonModel:
 
                 segments, _ = self.model.transcribe(wav_io, language="en", beam_size=5)
 
-                vtt_lines = ["WEBVTT\n"]
+                vtt_lines = [""]
                 for i, segment in enumerate(segments):
                     start = self.format_timestamp(segment.start)
                     end = self.format_timestamp(segment.end)
                     text = segment.text.strip()
-                    vtt_lines.append(f"{i+1}")
-                    vtt_lines.append(f"{start} --> {end}")
+                    vtt_lines.append(f"{start} -> {end}")
                     vtt_lines.append(f"{text}\n")
                 vtt_content = "\n".join(vtt_lines)
 
@@ -43,14 +42,12 @@ class TritonPythonModel:
                 logging.exception("Error in audio processing")
                 raise
         return responses
-    
+     
     def format_timestamp(self, seconds: float) -> str:
-        # Format time as HH:MM:SS.mmm for WebVTT
-        h = int(seconds // 3600)
+        # Format time as M:SS for WebVTT
         m = int((seconds % 3600) // 60)
         s = int(seconds % 60)
-        ms = int((seconds - int(seconds)) * 1000)
-        return f"{h:02}:{m:02}:{s:02}.{ms:03}"
+        return f"{m:01}:{s:02}"
 
     def finalize(self):
         pass
