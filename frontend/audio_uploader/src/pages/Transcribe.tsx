@@ -198,10 +198,21 @@ const Transcribe: React.FC = () => {
                     <div className="bg-gray-850 px-6 py-12 border-t border-gray-700 row-span-2">
                         {/* Future Audio Playback Component Goes Here */}
                         <div className='container mx-auto flex flex-col grid lg:grid-cols-3 gap-16 h-[calc(60vh-20rem)]'>
-                            <div className="relative flex-grow mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300 text-center text-gray-500 italic lg:col-span-2">
-                                Audio playback area (coming soon)
+                            <div className="relative flex-grow mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300 text-center text-gray-500   lg:col-span-2">
+                                {/* audio waveform */}
+                                {isLoading ? (
+                                    <div className="animate-pulse">
+                                        <h2 className="text-lg font-semibold mb-2">Loading audio...</h2>
+                                        <div className="h-4 bg-gray-700 rounded w-3/4 mx-auto mb-2"></div>
+                                        <div className="h-4 bg-gray-700 rounded w-2/3 mx-auto mb-2"></div>
+                                        <div className="h-4 bg-gray-700 rounded w-5/6 mx-auto mb-2"></div>
+                                        <div className="h-4 bg-gray-700 rounded w-1/2 mx-auto"></div>
+                                    </div>
+                                ) : (
+                                    <h2 className="text-lg font-semibold mb-2">Audio Playback Area</h2>
+                                )}
+                                
                                 {/* Progress Bar */}
-
                                 <div className="absolute inset-x-0 md:-bottom-8 lg:bottom-12 flex justify-center">
                                     <span className="text-white text-sm font-mono">{formatTime(currentTime)}</span>
                                     <div className="w-2/3 bg-white rounded h-2 m-2">
