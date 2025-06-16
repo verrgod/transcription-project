@@ -190,7 +190,7 @@ def process_message(message, producer):
             producer.flush()
             logging.info(f"Produced event for {vtt_name}")
             logging.info(f"Duration: {duration:.2f} seconds")
-            logging.info(f"Waveform sample length: {len(waveform)}")
+            logging.info(f"Waveform: {waveform.shape}")
 
 
 def kafka_loop():
