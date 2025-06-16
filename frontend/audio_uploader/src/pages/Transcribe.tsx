@@ -198,7 +198,7 @@ const Transcribe: React.FC = () => {
                     <div className="bg-gray-850 px-6 py-12 border-t border-gray-700 row-span-2">
                         {/* Future Audio Playback Component Goes Here */}
                         <div className='container mx-auto flex flex-col grid lg:grid-cols-3 gap-16 h-[calc(60vh-20rem)]'>
-                            <div className="relative flex-grow mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300 text-center text-gray-500   lg:col-span-2">
+                            <div className="relative flex-grow mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300 text-center text-gray-300 lg:col-span-2">
                                 {/* audio waveform */}
                                 {isLoading ? (
                                     <div className="animate-pulse">
@@ -209,9 +209,16 @@ const Transcribe: React.FC = () => {
                                         <div className="h-4 bg-gray-700 rounded w-1/2 mx-auto"></div>
                                     </div>
                                 ) : (
-                                    <h2 className="text-lg font-semibold mb-2">Audio Playback Area</h2>
+                                    <div>
+                                        <h2 className="text-lg font-semibold mb-2">Audio Playback Area</h2>
+                                        {waveform.length > 0 ? (
+                                            <div>{waveform}</div>
+                                        ) : (
+                                            <p className="italic text-gray-500">Upload an audio file to see the waveform.</p>
+                                        )}
+                                    </div>
                                 )}
-                                
+
                                 {/* Progress Bar */}
                                 <div className="absolute inset-x-0 md:-bottom-8 lg:bottom-12 flex justify-center">
                                     <span className="text-white text-sm font-mono">{formatTime(currentTime)}</span>
