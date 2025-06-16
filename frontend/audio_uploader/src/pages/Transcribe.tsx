@@ -11,7 +11,6 @@ const Transcribe: React.FC = () => {
     const audioRef = useRef<HTMLAudioElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
-    const [duration, setDuration] = useState(0);
     const togglePlayPause = () => {
         const audio = audioRef.current;
         if (!audio) return;
@@ -31,7 +30,7 @@ const Transcribe: React.FC = () => {
 
     const handleFastForward = () => {
         const audio = audioRef.current;
-        if (audio) audio.currentTime = Math.min(audio.currentTime + 5, duration);
+        if (audio && duration) audio.currentTime = Math.min(audio.currentTime + 5, duration);
     };
 
     /* update current time of progress bar */
@@ -40,8 +39,25 @@ const Transcribe: React.FC = () => {
         if (audio) setCurrentTime(audio.currentTime);
     };
 
+    /* convert base64 to Int16Array */
+    function base64ToInt16Array(base64: string): number[] {
+        const binaryString = window.atob(base64);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        const int16Arr = new Int16Array(bytes.buffer);
+        return Array.from(int16Arr);
+    }
+
     /* update subtitle column with audio duration */
     const [vttText, setVttText] = useState("")
+    const [duration, setDuration] = useState(0);
+
+    /* waveform */
+    const [waveform, setWaveform] = useState<number[]>([]);
+
     const [isLoading, setIsLoading] = useState(false);
 
     const handleButtonClick = () => {
@@ -89,11 +105,20 @@ const Transcribe: React.FC = () => {
                     params: { filename },
                 });
 
-                if (res.status == 200 && typeof res.data == "string" && res.data.trim() !== "") {
-                    setVttText(res.data);
-                    setIsLoading(false);
-                    toast.success("Transcription complete!");
-                    return;
+                if (res.status == 200 && res.data) {
+                    const { vtt_content, waveform, duration } = res.data;
+
+                    if (vtt_content && vtt_content.trim() !== "") {
+                        // set metadata
+                        setVttText(vtt_content);
+                        setWaveform(base64ToInt16Array(waveform));
+                        setDuration(parseFloat(duration));
+
+                        // notify user
+                        setIsLoading(false);
+                        toast.success("Transcription complete!");
+                        return;
+                    }
                 }
             } catch (error) {
                 console.error("Polling failed:", error);
@@ -104,6 +129,13 @@ const Transcribe: React.FC = () => {
         toast.error("Transcription timed out.");
         setIsLoading(false);
     };
+
+    /* format time in minutes:seconds */
+    function formatTime(seconds: number): string {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
 
     return (
         <div className="bg-gradient-to-b from-primary to-secondary w-full text-white flex flex-col items-center justify-center">
@@ -156,8 +188,8 @@ const Transcribe: React.FC = () => {
                             >
                                 <i className="fas fa-upload relative z-10"></i>
                                 <span className="relative z-10">Upload</span>
-                                <div className="absolute inset-0 rounded-md bg-gradient-to-r from-purple-500 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"/>
-                                <div className="absolute inset-0 rounded-md bg-white/20 opacity-0 group-hover:animate-ping"/>
+                                <div className="absolute inset-0 rounded-md bg-gradient-to-r from-purple-500 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                <div className="absolute inset-0 rounded-md bg-white/20 opacity-0 group-hover:animate-ping" />
                             </button>
                         </div>
                     </div>
@@ -169,13 +201,16 @@ const Transcribe: React.FC = () => {
                             <div className="relative flex-grow mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300 text-center text-gray-500 italic lg:col-span-2">
                                 Audio playback area (coming soon)
                                 {/* Progress Bar */}
+
                                 <div className="absolute inset-x-0 md:-bottom-8 lg:bottom-12 flex justify-center">
+                                    <span className="text-white text-sm font-mono">{formatTime(currentTime)}</span>
                                     <div className="w-2/3 bg-white rounded h-2 m-2">
                                         <div
                                             className="bg-purple-500 h-2 rounded"
                                             style={{ width: `${(currentTime / duration) * 100 || 0}%` }}
                                         />
                                     </div>
+                                    <span className="text-white text-sm font-mono">{formatTime(duration)}</span>
                                 </div>
 
                                 {/* Controls */}
