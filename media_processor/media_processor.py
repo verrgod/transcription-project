@@ -8,6 +8,7 @@ import re
 import unicodedata
 import os 
 import time
+import base64
 import socket
 from io import BytesIO
 from minio import Minio
@@ -18,6 +19,7 @@ from fastapi import FastAPI, File, APIRouter, HTTPException, Query
 from threading import Thread
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse
 from tritonclientutils import InferenceServerException
 
 
@@ -176,15 +178,20 @@ def process_message(message, producer):
         
         vtt_content, waveform, duration = result
         if vtt_content:
-            dest_name = f'{file_name}.vtt'
-            upload_to_minio('media-vtt', dest_name, vtt_content.encode('utf-8'), 'text/vtt')
-            producer.produce("vtt-upload", 'testing', dest_name)
+            vtt_name = f'{file_name}.vtt'
+            waveform_name = f'{file_name}.waveform'
+            duration_name = f'{file_name}.duration'
+            upload_to_minio('media-vtt', vtt_name, vtt_content.encode('utf-8'), 'text/vtt')
+            upload_to_minio('media-waveform', waveform_name, waveform.astype(np.int16).tobytes(), 'application/octet-stream')
+            upload_to_minio('media-duration', duration_name, str(duration).encode('utf-8'), 'text/plain')
+            producer.produce("vtt-upload", 'testing', vtt_name)
+            producer.produce("waveform-upload", 'testing', waveform_name)
+            producer.produce("duration-upload", 'testing', duration_name)
             producer.flush()
-            logging.info(f"Produced event for {dest_name}")
+            logging.info(f"Produced event for {vtt_name}")
             logging.info(f"Duration: {duration:.2f} seconds")
             logging.info(f"Waveform sample length: {len(waveform)}")
 
-            
 
 def kafka_loop():
     """Main function to run the Kafka consumer loop"""
@@ -234,18 +241,37 @@ def upload_file(file: bytes = File(...), filename: str = File(...)):
 @router.get("/vtt-ready")
 def receieve_file(filename: str = Query(...)):
     try:
-        vtt_file = f"{filename}.vtt"
-        response = minio_client.get_object("media-vtt", vtt_file)
+        # retrieve the different files from minio
+        
+        # vtt file
+        response = minio_client.get_object("media-vtt", f"{filename}.vtt")
         content = response.read().decode("utf-8")
         response.close()
         response.release_conn()
 
-        return PlainTextResponse(content, media_type="text/vtt")
+        # waveform file
+        waveform_obj = minio_client.get_object("media-waveform", f"{filename}.waveform")
+        waveform_bytes = waveform_obj.read()
+        waveform_obj.close()
+        waveform_obj.release_conn()
+        waveform_b64 = base64.b64encode(waveform_bytes).decode("utf-8")
+                
+        # duration file
+        duration_obj = minio_client.get_object("media-duration", f"{filename}.duration")
+        duration = duration_obj.read().decode("utf-8")
+        duration_obj.close()
+        duration_obj.release_conn()
+        
+        return JSONResponse({
+            "vtt_content": content,
+            "waveform": waveform_b64,
+            "duration": duration
+        })     
     
     except S3Error as error:
-        raise HTTPException(status_code=404, detail=f"VTT file not found: {vtt_file}")
-    
-    
+        raise HTTPException(status_code=404, detail=f"VTT file not found: {f"{filename}.vtt"}")
+
+
 @app.on_event("startup")
 def startup_event():
     thread = Thread(target=kafka_loop, daemon=True)
