@@ -114,12 +114,17 @@ def run_inference(audio_bytes):
             inputs[0].set_data_from_numpy(audio_np)
 
             outputs = [
-                httpclient.InferRequestedOutput("TRANSCRIPTION")
+                httpclient.InferRequestedOutput("TRANSCRIPTION"),
+                httpclient.InferRequestedOutput("WAVEFORM"),
+                httpclient.InferRequestedOutput("DURATION")
             ]
 
             response = client.infer(model_name="faster-whisper-large-v3", inputs=inputs, outputs=outputs)
             result = response.as_numpy("TRANSCRIPTION")[0].decode("utf-8")
-            return result
+            waveform = response.as_numpy("WAVEFORM")[0]
+            duration = response.as_numpy("DURATION")[0]
+            return result, waveform, duration
+        
     except (InferenceServerException, TimeoutError, socket.timeout) as e:
         logging.error(f"Inference error: {e}")
         return None
@@ -164,16 +169,21 @@ def process_message(message, producer):
     audio_bytes = retrieve_file_from_minio(bucket_name, file_name)
     if audio_bytes:
         wav_bytes = convert_to_wav_bytes(audio_bytes)
-        vtt_content = run_inference(wav_bytes)
-        if vtt_content is None:
+        result = run_inference(wav_bytes)
+        if result is None:
             logging.warning(f"Failed to process audio file: {file_name}")
             return
+        
+        vtt_content, waveform, duration = result
         if vtt_content:
             dest_name = f'{file_name}.vtt'
             upload_to_minio('media-vtt', dest_name, vtt_content.encode('utf-8'), 'text/vtt')
             producer.produce("vtt-upload", 'testing', dest_name)
             producer.flush()
             logging.info(f"Produced event for {dest_name}")
+            logging.info(f"Duration: {duration:.2f} seconds")
+            logging.info(f"Waveform sample length: {len(waveform)}")
+
             
 
 def kafka_loop():
