@@ -13,5 +13,15 @@ output [
     name: "TRANSCRIPTION"
     data_type: TYPE_STRING
     dims: [ 1 ]
+  },
+  {
+    name: "WAVEFORM"
+    data_type: TYPE_INT16
+    dims: [ -1 ]
+  },
+  {
+    name: "DURATION"
+    data_type: TYPE_FP32
+    dims: [ 1 ] 
   }
 ]
