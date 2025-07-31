@@ -1,10 +1,9 @@
 import React from 'react';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import { toast, ToastContainer } from 'react-toastify';
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState } from "react";
 import axios from "axios";
-import WaveSurfer from "wavesurfer.js";
-    
+
 const Transcribe: React.FC = () => {
     const backendURL = "http://localhost:8080/upload";
 
@@ -25,19 +24,19 @@ const Transcribe: React.FC = () => {
     };
 
     const handleRewind = () => {
-        const ws = wavesurferRef.current;
-        if (ws) ws.seekTo(Math.max((ws.getCurrentTime() - 5) / ws.getDuration(), 0));
+        const audio = audioRef.current;
+        if (audio) audio.currentTime = Math.max(audio.currentTime - 5, 0);
     };
 
     const handleFastForward = () => {
-        const ws = wavesurferRef.current;
-        if (ws) ws.seekTo(Math.min((ws.getCurrentTime() + 5) / ws.getDuration(), 1));
+        const audio = audioRef.current;
+        if (audio && duration) audio.currentTime = Math.min(audio.currentTime + 5, duration);
     };
 
     /* update current time of progress bar */
     const handleTimeUpdate = () => {
-        const ws = wavesurferRef.current;
-        if (ws) setCurrentTime(ws.getCurrentTime());
+        const audio = audioRef.current;
+        if (audio) setCurrentTime(audio.currentTime);
     };
 
     /* convert base64 to Int16Array */
@@ -58,8 +57,6 @@ const Transcribe: React.FC = () => {
 
     /* waveform */
     const [waveform, setWaveform] = useState<number[]>([]);
-    const wavesurferRef = useRef<WaveSurfer | null>(null);
-    const waveformContainerRef = useRef<HTMLDivElement>(null);
 
     const [isLoading, setIsLoading] = useState(false);
 
@@ -132,81 +129,6 @@ const Transcribe: React.FC = () => {
         toast.error("Transcription timed out.");
         setIsLoading(false);
     };
-
-    useEffect(() => {
-        function int16ArrayToWavBlob(int16Array: Int16Array, sampleRate: number): Blob {
-            const numChannels = 1;
-            const byteRate = sampleRate * numChannels * 2;
-            const blockAlign = numChannels * 2;
-
-            const buffer = new ArrayBuffer(44 + int16Array.length * 2);
-            const view = new DataView(buffer);
-
-            writeString(view, 0, 'RIFF');
-            view.setUint32(4, 36 + int16Array.length * 2, true);
-            writeString(view, 8, 'WAVE');
-
-            writeString(view, 12, 'fmt ');
-            view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true); // PCM
-            view.setUint16(22, numChannels, true);
-            view.setUint32(24, sampleRate, true);
-            view.setUint32(28, byteRate, true);
-            view.setUint16(32, blockAlign, true);
-            view.setUint16(34, 16, true); // Bits per sample
-
-            writeString(view, 36, 'data');
-            view.setUint32(40, int16Array.length * 2, true);
-
-            for (let i = 0; i < int16Array.length; i++) {
-                view.setInt16(44 + i * 2, int16Array[i], true);
-            }
-
-            return new Blob([view], { type: 'audio/wav' });
-        }
-
-        function writeString(view: DataView, offset: number, str: string) {
-            for (let i = 0; i < str.length; i++) {
-                view.setUint8(offset + i, str.charCodeAt(i));
-            }
-        }
-        if (waveform.length === 0) return;
-
-        // Destroy previous instance if it exists
-        if (wavesurferRef.current) {
-            wavesurferRef.current.destroy();
-        }
-
-        const ws = WaveSurfer.create({
-            container: '#waveform',
-            waveColor: '#7c3aed',
-            progressColor: '#a78bfa',
-            cursorColor: '#fff',
-            height: 96,
-        });
-
-        // Construct a WAV blob from Int16Array (assuming 44.1kHz, mono, PCM)
-        const wavBlob = int16ArrayToWavBlob(new Int16Array(waveform), 44100);
-        const blobUrl = URL.createObjectURL(wavBlob);
-
-        ws.load(blobUrl);
-
-        wavesurferRef.current = ws;
-
-        const updateTime = () => {
-            setCurrentTime(ws.getCurrentTime());
-        };
-
-        ws.on('audioprocess', updateTime);
-        ws.on('interaction', updateTime);
-        ws.on('ready', () => setDuration(ws.getDuration()));
-
-        return () => {
-            ws.un('audioprocess', updateTime);
-            ws.un('interaction', updateTime);
-            ws.destroy();
-        };
-    }, [waveform]);
 
     /* format time in minutes:seconds */
     function formatTime(seconds: number): string {
@@ -290,7 +212,7 @@ const Transcribe: React.FC = () => {
                                     <div>
                                         <h2 className="text-lg font-semibold mb-2">Audio Playback Area</h2>
                                         {waveform.length > 0 ? (
-                                            <div id="waveform" className="w-full h-24"></div>
+                                            <div>{waveform}</div>
                                         ) : (
                                             <p className="italic text-gray-500">Upload an audio file to see the waveform.</p>
                                         )}

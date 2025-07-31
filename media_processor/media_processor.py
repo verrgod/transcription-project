@@ -182,11 +182,7 @@ def process_message(message, producer):
             waveform_name = f'{file_name}.waveform'
             duration_name = f'{file_name}.duration'
             upload_to_minio('media-vtt', vtt_name, vtt_content.encode('utf-8'), 'text/vtt')
-            
-            waveform_bytes = waveform.astype(np.int16).tobytes()
-            waveform_base64 = base64.b64encode(waveform_bytes)
-            upload_to_minio('media-waveform', waveform_name, waveform_base64, 'text/plain')
-            
+            upload_to_minio('media-waveform', waveform_name, waveform.astype(np.int16).tobytes(), 'application/octet-stream')
             upload_to_minio('media-duration', duration_name, str(duration).encode('utf-8'), 'text/plain')
             producer.produce("vtt-upload", 'testing', vtt_name)
             producer.produce("waveform-upload", 'testing', waveform_name)
