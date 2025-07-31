@@ -4,22 +4,21 @@ import { toast, ToastContainer } from 'react-toastify';
 import { useRef, useState, useEffect } from "react";
 import axios from "axios";
 import WaveSurfer from "wavesurfer.js";
-    
+
 const Transcribe: React.FC = () => {
     const backendURL = "http://localhost:8080/upload";
 
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const audioRef = useRef<HTMLAudioElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const togglePlayPause = () => {
-        const audio = audioRef.current;
-        if (!audio) return;
+        const ws = wavesurferRef.current;
+        if (!ws) return;
 
         if (isPlaying) {
-            audio.pause();
+            ws.pause();
         } else {
-            audio.play();
+            ws.play();
         }
         setIsPlaying(!isPlaying);
     };
@@ -41,15 +40,16 @@ const Transcribe: React.FC = () => {
     };
 
     /* convert base64 to Int16Array */
-    function base64ToInt16Array(base64: string): number[] {
+    function base64ToInt16Array(base64: string): Int16Array {
         const binaryString = window.atob(base64);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
             bytes[i] = binaryString.charCodeAt(i);
         }
-        const int16Arr = new Int16Array(bytes.buffer);
-        return Array.from(int16Arr);
+
+        // Make sure we slice the buffer correctly
+        const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+        return new Int16Array(buffer);
     }
 
     /* update subtitle column with audio duration */
@@ -59,7 +59,6 @@ const Transcribe: React.FC = () => {
     /* waveform */
     const [waveform, setWaveform] = useState<number[]>([]);
     const wavesurferRef = useRef<WaveSurfer | null>(null);
-    const waveformContainerRef = useRef<HTMLDivElement>(null);
 
     const [isLoading, setIsLoading] = useState(false);
 
@@ -114,7 +113,7 @@ const Transcribe: React.FC = () => {
                     if (vtt_content && vtt_content.trim() !== "") {
                         // set metadata
                         setVttText(vtt_content);
-                        setWaveform(base64ToInt16Array(waveform));
+                        setWaveform(Array.from(base64ToInt16Array(waveform)));
                         setDuration(parseFloat(duration));
 
                         // notify user
@@ -199,11 +198,23 @@ const Transcribe: React.FC = () => {
 
         ws.on('audioprocess', updateTime);
         ws.on('interaction', updateTime);
-        ws.on('ready', () => setDuration(ws.getDuration()));
+        ws.on('ready', () => {
+            const waveDuration = ws.getDuration();
+            if (waveDuration > 0) {
+                setDuration(waveDuration);
+            } else {
+                console.warn("WaveSurfer duration is 0; keeping backend duration");
+            }
+        });
+        (ws as any).on('seek', (progress: number) => {
+            const time = progress * ws.getDuration();
+            setCurrentTime(time);
+        });
 
         return () => {
             ws.un('audioprocess', updateTime);
             ws.un('interaction', updateTime);
+            (ws as any).un('seek', () => { });
             ws.destroy();
         };
     }, [waveform]);

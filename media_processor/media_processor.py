@@ -78,6 +78,9 @@ def sanitize_filename(filename: str, max_length: int = 100) -> str:
 
 def convert_to_wav_bytes(audio_bytes):
     audio = AudioSegment.from_file(BytesIO(audio_bytes), format=None)
+    print(f"Sample rate of input audio: {audio.frame_rate} Hz") 
+    audio = audio.set_frame_rate(44100)
+    
     wav_io = BytesIO()
     audio.export(wav_io, format="wav")
     return wav_io.getvalue()
@@ -258,7 +261,7 @@ def receieve_file(filename: str = Query(...)):
         waveform_bytes = waveform_obj.read()
         waveform_obj.close()
         waveform_obj.release_conn()
-        waveform_b64 = base64.b64encode(waveform_bytes).decode("utf-8")
+        waveform_b64 = waveform_bytes.decode("utf-8")
                 
         # duration file
         duration_obj = minio_client.get_object("media-duration", f"{filename}.duration")
