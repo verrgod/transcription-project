@@ -8,6 +8,7 @@ import re
 import unicodedata
 import os 
 import time
+import base64
 import socket
 from io import BytesIO
 from minio import Minio
@@ -18,6 +19,7 @@ from fastapi import FastAPI, File, APIRouter, HTTPException, Query
 from threading import Thread
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse
 from tritonclientutils import InferenceServerException
 
 
@@ -76,6 +78,9 @@ def sanitize_filename(filename: str, max_length: int = 100) -> str:
 
 def convert_to_wav_bytes(audio_bytes):
     audio = AudioSegment.from_file(BytesIO(audio_bytes), format=None)
+    print(f"Sample rate of input audio: {audio.frame_rate} Hz") 
+    audio = audio.set_frame_rate(44100)
+    
     wav_io = BytesIO()
     audio.export(wav_io, format="wav")
     return wav_io.getvalue()
@@ -114,12 +119,17 @@ def run_inference(audio_bytes):
             inputs[0].set_data_from_numpy(audio_np)
 
             outputs = [
-                httpclient.InferRequestedOutput("TRANSCRIPTION")
+                httpclient.InferRequestedOutput("TRANSCRIPTION"),
+                httpclient.InferRequestedOutput("DURATION")
             ]
 
             response = client.infer(model_name="faster-whisper-large-v3", inputs=inputs, outputs=outputs)
             result = response.as_numpy("TRANSCRIPTION")[0].decode("utf-8")
-            return result
+            duration = response.as_numpy("DURATION")[0]
+            audio_b64 = base64.b64encode(wav_bytes)
+            
+            return result, duration, audio_b64
+        
     except (InferenceServerException, TimeoutError, socket.timeout) as e:
         logging.error(f"Inference error: {e}")
         return None
@@ -164,17 +174,29 @@ def process_message(message, producer):
     audio_bytes = retrieve_file_from_minio(bucket_name, file_name)
     if audio_bytes:
         wav_bytes = convert_to_wav_bytes(audio_bytes)
-        vtt_content = run_inference(wav_bytes)
-        if vtt_content is None:
+        result = run_inference(wav_bytes)
+        if result is None:
             logging.warning(f"Failed to process audio file: {file_name}")
             return
+        
+        vtt_content, duration, audio_b64 = result
+        
         if vtt_content:
-            dest_name = f'{file_name}.vtt'
-            upload_to_minio('media-vtt', dest_name, vtt_content.encode('utf-8'), 'text/vtt')
-            producer.produce("vtt-upload", 'testing', dest_name)
-            producer.flush()
-            logging.info(f"Produced event for {dest_name}")
+            vtt_name = f'{file_name}.vtt'
+            audio_name = f'{file_name}.audio'
+            duration_name = f'{file_name}.duration'
             
+            upload_to_minio('media-vtt', vtt_name, vtt_content.encode('utf-8'), 'text/vtt')
+            upload_to_minio('media-audio', audio_name, audio_b64, 'text/plain')
+            upload_to_minio('media-duration', duration_name, str(duration).encode('utf-8'), 'text/plain')
+            
+            producer.produce("vtt-upload", 'testing', vtt_name)
+            producer.produce("audio-upload", 'testing', audio_name)
+            producer.produce("duration-upload", 'testing', duration_name)
+            producer.flush()
+            
+            logging.info(f"Uploaded and produced events for {file_name}")
+
 
 def kafka_loop():
     """Main function to run the Kafka consumer loop"""
@@ -224,18 +246,36 @@ def upload_file(file: bytes = File(...), filename: str = File(...)):
 @router.get("/vtt-ready")
 def receieve_file(filename: str = Query(...)):
     try:
-        vtt_file = f"{filename}.vtt"
-        response = minio_client.get_object("media-vtt", vtt_file)
+        # retrieve the different files from minio
+        
+        # vtt file
+        response = minio_client.get_object("media-vtt", f"{filename}.vtt")
         content = response.read().decode("utf-8")
         response.close()
         response.release_conn()
 
-        return PlainTextResponse(content, media_type="text/vtt")
+        # audio file
+        audio_obj = minio_client.get_object("media-audio", f"{filename}.audio")
+        audio_b64 = audio_obj.read().decode("utf-8")
+        audio_obj.close()
+        audio_obj.release_conn()
+                
+        # duration file
+        duration_obj = minio_client.get_object("media-duration", f"{filename}.duration")
+        duration = duration_obj.read().decode("utf-8")
+        duration_obj.close()
+        duration_obj.release_conn()
+        
+        return JSONResponse({
+            "vtt_content": content,
+            "audio_blob": audio_b64,
+            "duration": duration
+        })     
     
     except S3Error as error:
-        raise HTTPException(status_code=404, detail=f"VTT file not found: {vtt_file}")
-    
-    
+        raise HTTPException(status_code=404, detail=f"VTT file not found: {f"{filename}.vtt"}")
+
+
 @app.on_event("startup")
 def startup_event():
     thread = Thread(target=kafka_loop, daemon=True)

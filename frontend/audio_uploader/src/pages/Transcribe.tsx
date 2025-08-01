@@ -1,47 +1,65 @@
 import React from 'react';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import { toast, ToastContainer } from 'react-toastify';
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import axios from "axios";
+import WaveSurfer from "wavesurfer.js";
 
 const Transcribe: React.FC = () => {
     const backendURL = "http://localhost:8080/upload";
 
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const audioRef = useRef<HTMLAudioElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
-    const [duration, setDuration] = useState(0);
     const togglePlayPause = () => {
-        const audio = audioRef.current;
-        if (!audio) return;
+        const ws = wavesurferRef.current;
+        if (!ws) return;
 
         if (isPlaying) {
-            audio.pause();
+            ws.pause();
         } else {
-            audio.play();
+            ws.play();
         }
         setIsPlaying(!isPlaying);
     };
 
     const handleRewind = () => {
-        const audio = audioRef.current;
-        if (audio) audio.currentTime = Math.max(audio.currentTime - 5, 0);
+        const ws = wavesurferRef.current;
+        if (ws) ws.seekTo(Math.max((ws.getCurrentTime() - 5) / ws.getDuration(), 0));
     };
 
     const handleFastForward = () => {
-        const audio = audioRef.current;
-        if (audio) audio.currentTime = Math.min(audio.currentTime + 5, duration);
+        const ws = wavesurferRef.current;
+        if (ws) ws.seekTo(Math.min((ws.getCurrentTime() + 5) / ws.getDuration(), 1));
     };
 
     /* update current time of progress bar */
     const handleTimeUpdate = () => {
-        const audio = audioRef.current;
-        if (audio) setCurrentTime(audio.currentTime);
+        const ws = wavesurferRef.current;
+        if (ws) setCurrentTime(ws.getCurrentTime());
     };
+
+    /* convert base64 to Int16Array */
+    function base64ToInt16Array(base64: string): Int16Array {
+        const binary = atob(base64);
+        const len = binary.length;
+        const buffer = new ArrayBuffer(len);
+        const view = new Uint8Array(buffer);
+
+        for (let i = 0; i < len; i++) {
+            view[i] = binary.charCodeAt(i);
+        }
+        return new Int16Array(buffer);
+    }
 
     /* update subtitle column with audio duration */
     const [vttText, setVttText] = useState("")
+    const [duration, setDuration] = useState(0);
+
+    /* waveform */
+    const [audioBlob, setAudioBlob] = useState<string>("");
+    const wavesurferRef = useRef<WaveSurfer | null>(null);
+
     const [isLoading, setIsLoading] = useState(false);
 
     const handleButtonClick = () => {
@@ -89,11 +107,20 @@ const Transcribe: React.FC = () => {
                     params: { filename },
                 });
 
-                if (res.status == 200 && typeof res.data == "string" && res.data.trim() !== "") {
-                    setVttText(res.data);
-                    setIsLoading(false);
-                    toast.success("Transcription complete!");
-                    return;
+                if (res.status == 200 && res.data) {
+                    const { vtt_content, audio_blob, duration } = res.data;
+
+                    if (vtt_content && vtt_content.trim() !== "") {
+                        // set metadata
+                        setVttText(vtt_content);
+                        setAudioBlob(audio_blob);
+                        setDuration(parseFloat(duration));
+
+                        // notify user
+                        setIsLoading(false);
+                        toast.success("Transcription complete!");
+                        return;
+                    }
                 }
             } catch (error) {
                 console.error("Polling failed:", error);
@@ -104,6 +131,68 @@ const Transcribe: React.FC = () => {
         toast.error("Transcription timed out.");
         setIsLoading(false);
     };
+
+    useEffect(() => {
+        if (!audioBlob || audioBlob.length === 0) return;
+
+        // Clean up any existing instance
+        if (wavesurferRef.current) {
+            wavesurferRef.current.destroy();
+        }
+
+        // Decode base64 to Uint8Array
+        const binaryString = atob(audioBlob);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        // Convert to audio blob
+        const blob = new Blob([bytes], { type: "audio/wav" });
+        const blobUrl = URL.createObjectURL(blob);
+
+        // Initialize WaveSurfer
+        const ws = WaveSurfer.create({
+            container: '#waveform',
+            waveColor: '#7c3aed',
+            progressColor: '#a78bfa',
+            cursorColor: '#fff',
+            height: 96,
+        });
+
+        ws.load(blobUrl);
+        wavesurferRef.current = ws;
+
+        const updateTime = () => setCurrentTime(ws.getCurrentTime());
+
+        ws.on('audioprocess', updateTime);
+        ws.on('interaction', updateTime);
+        ws.on('ready', () => {
+            const waveDuration = ws.getDuration();
+            if (waveDuration > 0) {
+                setDuration(waveDuration);
+            }
+        });
+
+        (ws as any).on('seek', (progress: number) => {
+            const time = progress * ws.getDuration();
+            setCurrentTime(time);
+        });
+
+        return () => {
+            ws.un('audioprocess', updateTime);
+            ws.un('interaction', updateTime);
+            (ws as any).un('seek', () => { });
+            ws.destroy();
+        };
+    }, [audioBlob]);
+
+    /* format time in minutes:seconds */
+    function formatTime(seconds: number): string {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
 
     return (
         <div className="bg-gradient-to-b from-primary to-secondary w-full text-white flex flex-col items-center justify-center">
@@ -156,8 +245,8 @@ const Transcribe: React.FC = () => {
                             >
                                 <i className="fas fa-upload relative z-10"></i>
                                 <span className="relative z-10">Upload</span>
-                                <div className="absolute inset-0 rounded-md bg-gradient-to-r from-purple-500 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"/>
-                                <div className="absolute inset-0 rounded-md bg-white/20 opacity-0 group-hover:animate-ping"/>
+                                <div className="absolute inset-0 rounded-md bg-gradient-to-r from-purple-500 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                <div className="absolute inset-0 rounded-md bg-white/20 opacity-0 group-hover:animate-ping" />
                             </button>
                         </div>
                     </div>
@@ -166,16 +255,37 @@ const Transcribe: React.FC = () => {
                     <div className="bg-gray-850 px-6 py-12 border-t border-gray-700 row-span-2">
                         {/* Future Audio Playback Component Goes Here */}
                         <div className='container mx-auto flex flex-col grid lg:grid-cols-3 gap-16 h-[calc(60vh-20rem)]'>
-                            <div className="relative flex-grow mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300 text-center text-gray-500 italic lg:col-span-2">
-                                Audio playback area (coming soon)
+                            <div className="relative flex-grow mt-6 p-4 bg-gray-800 border border-gray-700 rounded text-gray-300 text-center text-gray-300 lg:col-span-2">
+                                {/* audio waveform */}
+                                {isLoading ? (
+                                    <div className="animate-pulse">
+                                        <h2 className="text-lg font-semibold mb-2">Loading audio...</h2>
+                                        <div className="h-4 bg-gray-700 rounded w-3/4 mx-auto mb-2"></div>
+                                        <div className="h-4 bg-gray-700 rounded w-2/3 mx-auto mb-2"></div>
+                                        <div className="h-4 bg-gray-700 rounded w-5/6 mx-auto mb-2"></div>
+                                        <div className="h-4 bg-gray-700 rounded w-1/2 mx-auto"></div>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <h2 className="text-lg font-semibold mb-2">Audio Playback Area</h2>
+                                        {audioBlob.length > 0 ? (
+                                            <div id="waveform" className="w-full h-24"></div>
+                                        ) : (
+                                            <p className="italic text-gray-500">Upload an audio file to see the waveform.</p>
+                                        )}
+                                    </div>
+                                )}
+
                                 {/* Progress Bar */}
                                 <div className="absolute inset-x-0 md:-bottom-8 lg:bottom-12 flex justify-center">
+                                    <span className="text-white text-sm font-mono">{formatTime(currentTime)}</span>
                                     <div className="w-2/3 bg-white rounded h-2 m-2">
                                         <div
                                             className="bg-purple-500 h-2 rounded"
                                             style={{ width: `${(currentTime / duration) * 100 || 0}%` }}
                                         />
                                     </div>
+                                    <span className="text-white text-sm font-mono">{formatTime(duration)}</span>
                                 </div>
 
                                 {/* Controls */}
