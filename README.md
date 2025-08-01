@@ -15,11 +15,7 @@ https://www.figma.com/design/OAoM0d5upK1dLSgjYPa8N4/audio-transcription-project?
 docker compose up --build
 (Give Triton some time to install onto server, takes a while)
 
-Open MinIO as opened in port 9000.
-Upload audio file (mp3, wav etc.)
-New MinIO bucket created with .vtt file that includes transcription with timestamps. 
-
-**Features**
+## Features
 - Audio transcription
 - Playback w/ waveform display and audio controls
 - Dynamic subtitling (wip)
