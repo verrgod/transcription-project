@@ -41,14 +41,14 @@ const Transcribe: React.FC = () => {
 
     /* convert base64 to Int16Array */
     function base64ToInt16Array(base64: string): Int16Array {
-        const binaryString = window.atob(base64);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-        }
+        const binary = atob(base64);
+        const len = binary.length;
+        const buffer = new ArrayBuffer(len);
+        const view = new Uint8Array(buffer);
 
-        // Make sure we slice the buffer correctly
-        const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+        for (let i = 0; i < len; i++) {
+            view[i] = binary.charCodeAt(i);
+        }
         return new Int16Array(buffer);
     }
 
@@ -57,7 +57,7 @@ const Transcribe: React.FC = () => {
     const [duration, setDuration] = useState(0);
 
     /* waveform */
-    const [waveform, setWaveform] = useState<number[]>([]);
+    const [audioBlob, setAudioBlob] = useState<string>("");
     const wavesurferRef = useRef<WaveSurfer | null>(null);
 
     const [isLoading, setIsLoading] = useState(false);
@@ -108,12 +108,12 @@ const Transcribe: React.FC = () => {
                 });
 
                 if (res.status == 200 && res.data) {
-                    const { vtt_content, waveform, duration } = res.data;
+                    const { vtt_content, audio_blob, duration } = res.data;
 
                     if (vtt_content && vtt_content.trim() !== "") {
                         // set metadata
                         setVttText(vtt_content);
-                        setWaveform(Array.from(base64ToInt16Array(waveform)));
+                        setAudioBlob(audio_blob);
                         setDuration(parseFloat(duration));
 
                         // notify user
@@ -133,49 +133,25 @@ const Transcribe: React.FC = () => {
     };
 
     useEffect(() => {
-        function int16ArrayToWavBlob(int16Array: Int16Array, sampleRate: number): Blob {
-            const numChannels = 1;
-            const byteRate = sampleRate * numChannels * 2;
-            const blockAlign = numChannels * 2;
+        if (!audioBlob || audioBlob.length === 0) return;
 
-            const buffer = new ArrayBuffer(44 + int16Array.length * 2);
-            const view = new DataView(buffer);
-
-            writeString(view, 0, 'RIFF');
-            view.setUint32(4, 36 + int16Array.length * 2, true);
-            writeString(view, 8, 'WAVE');
-
-            writeString(view, 12, 'fmt ');
-            view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true); // PCM
-            view.setUint16(22, numChannels, true);
-            view.setUint32(24, sampleRate, true);
-            view.setUint32(28, byteRate, true);
-            view.setUint16(32, blockAlign, true);
-            view.setUint16(34, 16, true); // Bits per sample
-
-            writeString(view, 36, 'data');
-            view.setUint32(40, int16Array.length * 2, true);
-
-            for (let i = 0; i < int16Array.length; i++) {
-                view.setInt16(44 + i * 2, int16Array[i], true);
-            }
-
-            return new Blob([view], { type: 'audio/wav' });
-        }
-
-        function writeString(view: DataView, offset: number, str: string) {
-            for (let i = 0; i < str.length; i++) {
-                view.setUint8(offset + i, str.charCodeAt(i));
-            }
-        }
-        if (waveform.length === 0) return;
-
-        // Destroy previous instance if it exists
+        // Clean up any existing instance
         if (wavesurferRef.current) {
             wavesurferRef.current.destroy();
         }
 
+        // Decode base64 to Uint8Array
+        const binaryString = atob(audioBlob);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        // Convert to audio blob
+        const blob = new Blob([bytes], { type: "audio/wav" });
+        const blobUrl = URL.createObjectURL(blob);
+
+        // Initialize WaveSurfer
         const ws = WaveSurfer.create({
             container: '#waveform',
             waveColor: '#7c3aed',
@@ -184,17 +160,10 @@ const Transcribe: React.FC = () => {
             height: 96,
         });
 
-        // Construct a WAV blob from Int16Array (assuming 44.1kHz, mono, PCM)
-        const wavBlob = int16ArrayToWavBlob(new Int16Array(waveform), 44100);
-        const blobUrl = URL.createObjectURL(wavBlob);
-
         ws.load(blobUrl);
-
         wavesurferRef.current = ws;
 
-        const updateTime = () => {
-            setCurrentTime(ws.getCurrentTime());
-        };
+        const updateTime = () => setCurrentTime(ws.getCurrentTime());
 
         ws.on('audioprocess', updateTime);
         ws.on('interaction', updateTime);
@@ -202,10 +171,9 @@ const Transcribe: React.FC = () => {
             const waveDuration = ws.getDuration();
             if (waveDuration > 0) {
                 setDuration(waveDuration);
-            } else {
-                console.warn("WaveSurfer duration is 0; keeping backend duration");
             }
         });
+
         (ws as any).on('seek', (progress: number) => {
             const time = progress * ws.getDuration();
             setCurrentTime(time);
@@ -217,7 +185,7 @@ const Transcribe: React.FC = () => {
             (ws as any).un('seek', () => { });
             ws.destroy();
         };
-    }, [waveform]);
+    }, [audioBlob]);
 
     /* format time in minutes:seconds */
     function formatTime(seconds: number): string {
@@ -300,7 +268,7 @@ const Transcribe: React.FC = () => {
                                 ) : (
                                     <div>
                                         <h2 className="text-lg font-semibold mb-2">Audio Playback Area</h2>
-                                        {waveform.length > 0 ? (
+                                        {audioBlob.length > 0 ? (
                                             <div id="waveform" className="w-full h-24"></div>
                                         ) : (
                                             <p className="italic text-gray-500">Upload an audio file to see the waveform.</p>

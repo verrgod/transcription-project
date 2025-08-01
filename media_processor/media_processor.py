@@ -120,15 +120,15 @@ def run_inference(audio_bytes):
 
             outputs = [
                 httpclient.InferRequestedOutput("TRANSCRIPTION"),
-                httpclient.InferRequestedOutput("WAVEFORM"),
                 httpclient.InferRequestedOutput("DURATION")
             ]
 
             response = client.infer(model_name="faster-whisper-large-v3", inputs=inputs, outputs=outputs)
             result = response.as_numpy("TRANSCRIPTION")[0].decode("utf-8")
-            waveform = response.as_numpy("WAVEFORM")[0]
             duration = response.as_numpy("DURATION")[0]
-            return result, waveform, duration
+            audio_b64 = base64.b64encode(wav_bytes)
+            
+            return result, duration, audio_b64
         
     except (InferenceServerException, TimeoutError, socket.timeout) as e:
         logging.error(f"Inference error: {e}")
@@ -179,25 +179,23 @@ def process_message(message, producer):
             logging.warning(f"Failed to process audio file: {file_name}")
             return
         
-        vtt_content, waveform, duration = result
+        vtt_content, duration, audio_b64 = result
+        
         if vtt_content:
             vtt_name = f'{file_name}.vtt'
-            waveform_name = f'{file_name}.waveform'
+            audio_name = f'{file_name}.audio'
             duration_name = f'{file_name}.duration'
+            
             upload_to_minio('media-vtt', vtt_name, vtt_content.encode('utf-8'), 'text/vtt')
-            
-            waveform_bytes = waveform.astype(np.int16).tobytes()
-            waveform_base64 = base64.b64encode(waveform_bytes)
-            upload_to_minio('media-waveform', waveform_name, waveform_base64, 'text/plain')
-            
+            upload_to_minio('media-audio', audio_name, audio_b64, 'text/plain')
             upload_to_minio('media-duration', duration_name, str(duration).encode('utf-8'), 'text/plain')
+            
             producer.produce("vtt-upload", 'testing', vtt_name)
-            producer.produce("waveform-upload", 'testing', waveform_name)
+            producer.produce("audio-upload", 'testing', audio_name)
             producer.produce("duration-upload", 'testing', duration_name)
             producer.flush()
-            logging.info(f"Produced event for {vtt_name}")
-            logging.info(f"Duration: {duration:.2f} seconds")
-            logging.info(f"Waveform: {waveform.shape}")
+            
+            logging.info(f"Uploaded and produced events for {file_name}")
 
 
 def kafka_loop():
@@ -256,12 +254,11 @@ def receieve_file(filename: str = Query(...)):
         response.close()
         response.release_conn()
 
-        # waveform file
-        waveform_obj = minio_client.get_object("media-waveform", f"{filename}.waveform")
-        waveform_bytes = waveform_obj.read()
-        waveform_obj.close()
-        waveform_obj.release_conn()
-        waveform_b64 = waveform_bytes.decode("utf-8")
+        # audio file
+        audio_obj = minio_client.get_object("media-audio", f"{filename}.audio")
+        audio_b64 = audio_obj.read().decode("utf-8")
+        audio_obj.close()
+        audio_obj.release_conn()
                 
         # duration file
         duration_obj = minio_client.get_object("media-duration", f"{filename}.duration")
@@ -271,7 +268,7 @@ def receieve_file(filename: str = Query(...)):
         
         return JSONResponse({
             "vtt_content": content,
-            "waveform": waveform_b64,
+            "audio_blob": audio_b64,
             "duration": duration
         })     
     
