@@ -1,4 +1,4 @@
-# This project is currently in development.
+# This project is functional & currently in development.
 
 ## Pipeline
 1. Multimedia object (audio or video) is pushed into a MinIO bucket
@@ -21,7 +21,6 @@ New MinIO bucket created with .vtt file that includes transcription with timesta
 
 **Features**
 - Audio transcription
+- Playback w/ waveform display and audio controls
+- Dynamic subtitling (wip)
 
-- Dynamic subtitling
-
-- Audio playback and controls
